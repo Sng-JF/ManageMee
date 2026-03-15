@@ -68,25 +68,30 @@ export default function QuickSale({ menuItem, onClose, onConfirm }: QuickSalePro
     });
   };
 
-  const handleConfirmSale = () => {
-    // Calculate inventory deductions
-    const updates = ingredientAdjustments.map(ingredient => {
-      // Mock current inventory - in real app, get from inventory state
-      const mockCurrentStock = 10; // This should come from actual inventory
-      const deduction = ingredient.adjustedQuantity * quantity;
-      
-      return {
-        id: ingredient.inventoryItemId,
-        name: ingredient.inventoryItemName,
-        deduction,
-        unit: ingredient.unit,
-        previousStock: mockCurrentStock,
-        newStock: mockCurrentStock - deduction
-      };
-    });
-    
-    setInventoryUpdates(updates);
+  const handleConfirmSale = async () => {
     setAnimationStage('deducting');
+
+  try {
+    // 1. Send the sale to the backend
+    const response = await fetch('http://localhost:5432/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        menuItemId: menuItem.id,
+        menuItemName: menuItem.name,
+        quantity: quantity
+      })
+    });
+
+    const data = await response.json();
+    
+    // Optional: If your backend returns the updated inventory levels in the response,
+    // you can pass them down to setInventoryUpdates to keep your animations accurate!
+    
+  } catch (error) {
+    console.error('Failed to process sale:', error);
+    // Handle error UI here
+  }
   };
 
   // 1️⃣ Handle transition to complete

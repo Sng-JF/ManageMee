@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Package } from 'lucide-react';
-import { inventoryItems as initialItems } from '../data/mockData';
 import AddEditItem from './AddEditItem';
 import LowStockAlert from './LowStockAlert';
 import RestockModal from './RestockModal';
@@ -13,7 +12,8 @@ interface InventoryListProps {
 
 export default function InventoryList({ initialSubTab = 'stock', onFormStateChange }: InventoryListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [items, setItems] = useState<InventoryItem[]>(initialItems);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddEdit, setShowAddEdit] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [showLowStockAlert, setShowLowStockAlert] = useState(false);
@@ -21,33 +21,37 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
   const [restockingItem, setRestockingItem] = useState<InventoryItem | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'restock'>(initialSubTab === 'restock' ? 'restock' : 'overview');
 
-  // Check for low stock items on mount - only show once per session
   useEffect(() => {
-    const hasShownAlert = sessionStorage.getItem('lowStockAlertShown');
-    if (!hasShownAlert) {
-      const lowStockItems = items.filter(item => item.quantity < item.minQuantity);
-      if (lowStockItems.length > 0) {
-        setShowLowStockAlert(true);
-        sessionStorage.setItem('lowStockAlertShown', 'true');
-      }
-    }
-  }, [items]);
+    fetch('http://localhost:5432/api/inventory')
+      .then(res => res.json())
+      .then(data => {
+        setItems(data);
+        setIsLoading(false);
+      })
+      .catch(error => console.error('Error fetching inventory:', error));
+  }, []);
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddItem = (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
-    const newItem: InventoryItem = {
-      ...item,
-      id: Date.now().toString(),
-      lastUpdated: new Date().toISOString()
-    };
-    setItems([...items, newItem]);
-    setShowAddEdit(false);
-    if (onFormStateChange) {
-      onFormStateChange(false);
+  const handleAddItem = async (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
+    try {
+      const response = await fetch('http://localhost:5432/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+      });
+      
+      const newItem = await response.json();
+      
+      // Update local state with the real item from the database
+      setItems([...items, newItem]);
+      setShowAddEdit(false);
+      if (onFormStateChange) onFormStateChange(false);
+    } catch (error) {
+      console.error('Failed to add item:', error);
     }
   };
 

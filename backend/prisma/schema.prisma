@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model InventoryItem {
+  id               String             @id @default(uuid())
+  name             String
+  category         String
+  quantity         Float
+  unit             String
+  minQuantity      Float
+  supplier         String
+  lastUpdated      DateTime           @updatedAt
+  targetPrice      Float
+  
+  // Storing pending restock as JSON for simplicity, matching your optional object
+  pendingRestock   Json?              
+
+  // Relations
+  menuIngredients  RecipeIngredient[]
+  supplierPrices   SupplierPrice[]
+}
+
+model Supplier {
+  id      String   @id @default(uuid())
+  name    String
+  phone   String
+  items   String[] // Array of item IDs or categories they supply
+}
+
+model SupplierPrice {
+  id              String        @id @default(uuid())
+  supplierId      String
+  supplierName    String
+  inventoryItemId String
+  price           Float
+  lastUpdated     DateTime      @updatedAt
+
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+}
+
+model MenuItem {
+  id          String             @id @default(uuid())
+  name        String
+  price       Float
+  category    String
+  
+  ingredients RecipeIngredient[]
+  sales       SaleRecord[]
+}
+
+model RecipeIngredient {
+  id                String        @id @default(uuid())
+  menuItemId        String
+  inventoryItemId   String
+  inventoryItemName String
+  quantity          Float
+  unit              String
+
+  menuItem          MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id])
+}
+
+model SaleRecord {
+  id            String   @id @default(uuid())
+  menuItemId    String
+  menuItemName  String
+  quantity      Int
+  timestamp     DateTime @default(now())
+
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id])
+}

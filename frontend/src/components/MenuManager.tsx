@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Zap, ChevronDown, ChevronUp, Search } from 'lucide-react';
-import { menuItems as initialMenuItems } from '../data/menuData';
 import { MenuItem } from '../types/menu';
 import EditMenuItem from './EditMenuItem';
 import DishAvailability from './DishAvailability';
@@ -12,7 +11,7 @@ interface MenuManagerProps {
 }
 
 export default function MenuManager({ initialSubTab = 'all', onFormStateChange }: MenuManagerProps) {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
@@ -20,16 +19,37 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange }
   const [activeTab, setActiveTab] = useState<'all' | 'work'>(initialSubTab);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSaveMenuItem = (item: MenuItem) => {
-    if (editingItem) {
-      setMenuItems(menuItems.map(m => m.id === item.id ? item : m));
-    } else {
-      setMenuItems([...menuItems, item]);
-    }
-    setShowEdit(false);
-    setEditingItem(null);
-    if (onFormStateChange) {
-      onFormStateChange(false);
+  useEffect(() => {
+    fetch('http://localhost:5432/api/menu')
+      .then(res => res.json())
+      .then(data => setMenuItems(data))
+      .catch(err => console.error('Failed to load menu:', err));
+  }, []);
+
+  const handleSaveMenuItem = async (item: MenuItem) => {
+    try {
+      // Note: You'll need to separate logic here for POST (new) vs PUT/PATCH (edit)
+      const isNew = !editingItem;
+      const url = isNew ? 'http://localhost:5432/api/menu' : `http://localhost:5432/api/menu/${item.id}`;
+      
+      const response = await fetch(url, {
+        method: isNew ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+      });
+
+      const savedItem = await response.json();
+
+      if (isNew) {
+        setMenuItems([...menuItems, savedItem]);
+      } else {
+        setMenuItems(menuItems.map(m => m.id === savedItem.id ? savedItem : m));
+      }
+      
+      setShowEdit(false);
+      setEditingItem(null);
+    } catch (error) {
+      console.error('Error saving menu item:', error);
     }
   };
 
