@@ -1,0 +1,122 @@
+ManageMee - How to Run (Windows)
+================================
+
+Prerequisites
+-------------
+1) Node.js 18+ (Node 20 LTS recommended)
+2) npm (comes with Node.js)
+3) PostgreSQL running locally or remotely
+
+Project Structure
+-----------------
+- backend: Express + Prisma + PostgreSQL
+- frontend: React + Vite
+
+Commands (Copy/Paste)
+---------------------
+From project root (c:\GitHub\ManageMee), use these PowerShell commands.
+
+One-Time Setup
+--------------
+1) Install backend dependencies:
+   cd backend
+   npm install
+
+2) Create backend .env file (backend/.env):
+   DATABASE_URL="postgresql://USERNAME:PASSWORD@HOST:5432/DB_NAME?schema=public"
+   PORT=3001
+
+3) Push Prisma schema to the database:
+   cd backend
+   npx prisma db push
+
+4) Install frontend dependencies:
+   cd frontend
+   npm install
+
+One-Time Setup Commands
+-----------------------
+Run these one by one in PowerShell:
+
+- cd ./backend
+- npm install
+
+@"
+DATABASE_URL=\"postgresql://USERNAME:PASSWORD@HOST:5432/DB_NAME?schema=public\"
+PORT=3001
+"@ | Set-Content .env
+
+npx prisma db push
+
+cd ./frontend
+npm install
+
+Run in Development
+------------------
+Open two terminals from the project root.
+
+Terminal 1 (Backend):
+1) cd backend
+2) npm run dev
+
+Expected backend message:
+Backend server running on http://localhost:3001
+
+Terminal 2 (Frontend):
+1) cd frontend
+2) npm run dev
+
+Expected frontend URL:
+http://localhost:3000
+
+Development Commands
+--------------------
+Terminal 1 (Backend):
+
+cd ./backend
+npm run dev
+
+Terminal 2 (Frontend):
+
+cd ./frontend
+npm run dev
+
+Production Build (Optional)
+---------------------------
+Backend:
+1) cd backend
+2) npm run build
+3) npm run start
+
+Frontend:
+1) cd frontend
+2) npm run build
+
+Production Commands
+-------------------
+Backend:
+
+cd ./backend
+npm run build
+npm run start
+
+Frontend:
+
+cd ./frontend
+npm run build
+
+Troubleshooting
+---------------
+1) Error: DATABASE_URL is undefined
+   - Ensure backend/.env exists and includes DATABASE_URL.
+
+2) Prisma or DB errors
+   - Verify PostgreSQL is running and credentials in DATABASE_URL are correct.
+   - Re-run: cd backend && npx prisma db push
+
+3) Port already in use
+   - Change PORT in backend/.env for backend.
+   - Change Vite port in frontend/vite.config.ts for frontend.
+
+4) Fresh reinstall
+   - Delete node_modules in backend and frontend, then run npm install again in each folder.
