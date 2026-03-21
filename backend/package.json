@@ -5,9 +5,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "prisma db push && ts-node src/server.ts",
-    "build": "tsc",
-    "start": "prisma migrate deploy && node dist/server.js"
+    "dev": "prisma generate && prisma db push && tsx src/server.ts",
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
     "nodemon": "^3.1.14",
     "prisma": "^7.5.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

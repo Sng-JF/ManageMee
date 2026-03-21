@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -7,29 +8,27 @@ datasource db {
 }
 
 model InventoryItem {
-  id               String             @id @default(uuid())
-  name             String
-  category         String
-  quantity         Float
-  unit             String
-  minQuantity      Float
-  supplier         String
-  lastUpdated      DateTime           @updatedAt
-  targetPrice      Float
-  
-  // Storing pending restock as JSON for simplicity, matching your optional object
-  pendingRestock   Json?              
+  id              String             @id @default(uuid())
+  name            String
+  category        String
+  quantity        Float
+  unit            String
+  minQuantity     Float
+  supplier        String
+  lastUpdated     DateTime           @updatedAt
+  targetPrice     Float
+  pendingRestock  Json?
 
-  // Relations
-  menuIngredients  RecipeIngredient[]
-  supplierPrices   SupplierPrice[]
+  menuIngredients RecipeIngredient[]
+  supplierPrices  SupplierPrice[]
 }
 
 model Supplier {
-  id      String   @id @default(uuid())
-  name    String
-  phone   String
-  items   String[] // Array of item IDs or categories they supply
+  id     String          @id @default(uuid())
+  name   String
+  phone  String
+  items  String[]
+  prices SupplierPrice[]
 }
 
 model SupplierPrice {
@@ -40,7 +39,11 @@ model SupplierPrice {
   price           Float
   lastUpdated     DateTime      @updatedAt
 
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  supplier        Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([inventoryItemId])
 }
 
 model MenuItem {
@@ -48,7 +51,8 @@ model MenuItem {
   name        String
   price       Float
   category    String
-  
+  image       String?
+
   ingredients RecipeIngredient[]
   sales       SaleRecord[]
 }
@@ -62,15 +66,21 @@ model RecipeIngredient {
   unit              String
 
   menuItem          MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([menuItemId])
+  @@index([inventoryItemId])
 }
 
 model SaleRecord {
-  id            String   @id @default(uuid())
-  menuItemId    String
-  menuItemName  String
-  quantity      Int
-  timestamp     DateTime @default(now())
+  id           String   @id @default(uuid())
+  menuItemId   String
+  menuItemName String
+  quantity     Int
+  timestamp    DateTime @default(now())
 
-  menuItem      MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItem     MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([menuItemId])
+  @@index([timestamp])
 }
