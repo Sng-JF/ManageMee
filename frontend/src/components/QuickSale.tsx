@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle, X, TrendingDown, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { MenuItem } from '../types/menu';
 import { InventoryItem } from '../types/inventory';
