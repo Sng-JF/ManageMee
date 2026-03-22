@@ -219,7 +219,8 @@ export default function AddEditItem({ item, onSave, onCancel }: AddEditItemProps
               value={formData.targetPrice}
               onChange={(e) => setFormData({ ...formData, targetPrice: e.target.value })}
               placeholder="0.00"
-              className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
+              className="w-full pl-80 pr-4 py-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
+              style={{paddingLeft: "30px"}}
             />
           </div>
         </div>

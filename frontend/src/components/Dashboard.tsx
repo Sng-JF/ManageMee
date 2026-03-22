@@ -7,13 +7,15 @@ import { prepRecommendations } from '../data/forecastData';
 import { recentSales } from '../data/salesData';
 import DailyPrepForecast from './DailyPrepForecast';
 import SalesPrediction from './SalesPrediction';
+import PriceComparison from './PriceComparison';
 
 interface DashboardProps {
   onNavigateToWorkMode: () => void;
   onNavigateToRestock: () => void;
+  onFormStateChange?: (isOpen: boolean) => void;
 }
 
-export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock }: DashboardProps) {
+export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock, onFormStateChange }: DashboardProps) {
   const [forecastData, setForecastData] = useState<any>(null);
   const totalSales = todaySalesData.reduce((sum, data) => sum + data.sales, 0);
   const [showSalesPrediction, setShowSalesPrediction] = useState(false);
@@ -65,12 +67,12 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock }:
 
 
         {/* Daily Prep Forecast Widget */}
-        <div className="mb-3">
+        {/* <div className="mb-3">
           <DailyPrepForecast 
             onViewDetails={() => setShowSalesPrediction(true)} 
             recommendations={forecastData?.prepRecommendations} 
           />
-        </div>
+        </div> */}
 
         
         {/* Track Order Button */}
@@ -102,7 +104,7 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock }:
           </div>
           {isTodaysSalesExpanded && (
             <div className="space-y-2">
-              {topFiveSales.map((sale) => (
+              {/* {topFiveSales.map((sale) => (
                 <div
                   key={sale.id}
                   className="bg-white border-2 border-gray-300 rounded-lg p-3"
@@ -114,21 +116,23 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock }:
                     </div>
                     <div className="text-right">
                       <p className="text-orange-500 font-bold text-xl">${sale.total.toFixed(2)}</p>
-                      <p className="text-gray-600 font-semibold text-sm">Qty: {sale.quantity}</p>
                     </div>
                   </div>
                 </div>
-              ))}
+              ))} */}
               
               {/* See More Button */}
-              <button
+              {/* <button
                 className="w-full bg-white border-2 border-orange-500 text-orange-500 rounded-lg p-3 font-bold text-base active:bg-orange-50 transition-colors"
               >
                 See More
-              </button>
+              </button> */}
             </div>
           )}
         </div>
+
+        {/* Analytics Section */}
+        <PriceComparison hideHeader onFormStateChange={onFormStateChange} />
 
         {/* Today's Sales */}
         {/*

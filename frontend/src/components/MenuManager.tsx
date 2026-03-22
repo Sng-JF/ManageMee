@@ -261,7 +261,7 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange }
                               {!isExpanded && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <p className="text-gray-600 font-bold text-xs">
-                                    {item.ingredients.length} ingredients
+                                    {item.ingredients.length} {item.ingredients.length === 1 ? 'ingredient' : 'ingredients'}
                                   </p>
                                   <span className="text-gray-400">•</span>
                                   <p className="text-gray-600 font-bold text-xs">

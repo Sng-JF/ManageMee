@@ -9,7 +9,7 @@ import { InventoryItem } from '../types/inventory';
 import LogPrice from './LogPrice';
 import AddEditItem from './AddEditItem';
 
-export default function PriceComparison({ onFormStateChange }: { onFormStateChange?: (isOpen: boolean) => void }) {
+export default function PriceComparison({ onFormStateChange, hideHeader }: { onFormStateChange?: (isOpen: boolean) => void; hideHeader?: boolean }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showLogPrice, setShowLogPrice] = useState(false);
@@ -111,12 +111,13 @@ export default function PriceComparison({ onFormStateChange }: { onFormStateChan
   return (
     <div className="p-3">
       {/* Header */}
-      <div className="mb-3">
-        <div className="bg-orange-600 rounded-lg p-3 mb-2">
-          <h1 className="text-2xl font-bold text-white">Analytics</h1>
+      {!hideHeader && (
+        <div className="mb-3">
+          <div className="bg-orange-600 rounded-lg p-3 mb-2">
+            <h1 className="text-2xl font-bold text-white">Analytics</h1>
+          </div>
         </div>
-        
-      </div>
+      )}
 
       {/* Analytics Overview */}
       <div className="mb-3">
@@ -196,16 +197,17 @@ export default function PriceComparison({ onFormStateChange }: { onFormStateChan
           </div>
 
           {/* Chart Display */}
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={260}>
             {chartMode === 'sales' ? (
-              <BarChart data={performanceData} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
+              <BarChart data={performanceData} margin={{ left: 0, right: 0, top: 10, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
                   dataKey="name" 
                   stroke="#666666"
-                  style={{ fontSize: '10px', fontWeight: 'normal' }}
-                  tick={{ fill: '#666666' }}
+                  tick={{ fill: '#666666', fontSize: 10 }}
                   interval={0}
+                  angle={-40}
+                  textAnchor="end"
                 />
                 <YAxis 
                   stroke="#666666"
@@ -222,14 +224,15 @@ export default function PriceComparison({ onFormStateChange }: { onFormStateChan
                 <Bar dataKey="sales" fill="#ea580c" radius={[8, 8, 0, 0]} />
               </BarChart>
             ) : (
-              <BarChart data={financesData} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
+              <BarChart data={financesData} margin={{ left: 0, right: 0, top: 10, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
                   dataKey="name" 
                   stroke="#666666"
-                  style={{ fontSize: '10px', fontWeight: 'normal' }}
-                  tick={{ fill: '#666666' }}
+                  tick={{ fill: '#666666', fontSize: 10 }}
                   interval={0}
+                  angle={-40}
+                  textAnchor="end"
                 />
                 <YAxis 
                   stroke="#666666"

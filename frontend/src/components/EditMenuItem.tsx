@@ -345,10 +345,10 @@ export default function EditMenuItem({ item, onSave, onCancel, onDelete }: EditM
             <div className="bg-white p-6 rounded-lg shadow-lg">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Confirm Delete</h2>
               <p className="text-gray-600 mb-6">Are you sure you want to delete this dish?</p>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-4">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="bg-gray-600 text-white rounded-lg p-3 font-bold active:bg-gray-700 transition-colors mr-3"
+                  className="bg-gray-600 text-white rounded-lg p-3 font-bold active:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
