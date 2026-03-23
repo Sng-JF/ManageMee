@@ -128,3 +128,24 @@ export const recordSale = (data: {
     method: 'POST',
     body: JSON.stringify(data),
   });
+
+// ─── Voice Transcription ──────────────────────────────────────────────────────
+
+export const transcribeAudio = async (audioBlob: Blob, mimeType: string): Promise<string> => {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'recording.webm');
+  formData.append('mimeType', mimeType);
+
+  const res = await fetch(`${API_BASE}/api/voice/transcribe`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any).error ?? `Transcription failed (HTTP ${res.status})`);
+  }
+
+  const data = await res.json();
+  return data.transcript as string;
+};
