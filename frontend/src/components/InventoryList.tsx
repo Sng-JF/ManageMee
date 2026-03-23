@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Package, ChevronDown, ChevronRight } from 'lucide-react';
-import { inventoryItems as initialItems } from '../data/mockData';
 import { categories } from '../data/constants';
 import AddEditItem from './AddEditItem';
 import LowStockAlert from './LowStockAlert';

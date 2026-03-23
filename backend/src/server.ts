@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import type { Response } from "express";
 import cors from "cors";
+import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "./generated/prisma/client.js";
 
@@ -11,7 +12,8 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const adapter = new PrismaPg({ connectionString });
+const pool = new pg.Pool({ connectionString });
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -1099,6 +1101,49 @@ app.get('/api/forecast/today', async (req, res) => {
   } catch (error) {
     console.error('Forecast generation failed:', error);
     res.status(500).json({ error: 'Failed to generate demand forecast' });
+  }
+});
+
+app.get("/api/settings", async (_req, res) => {
+  try {
+    // @ts-ignore - StallSettings might not be in generated types yet
+    let settings = await (prisma as any).stallSettings.findFirst();
+    
+    // Create default settings if none exist
+    if (!settings) {
+      settings = await (prisma as any).stallSettings.create({ data: {} });
+    }
+    
+    return res.json(settings);
+  } catch (error) {
+    return sendInternalError(res, "Failed to fetch settings.", error);
+  }
+});
+
+app.put("/api/settings", async (req, res) => {
+  try {
+    const { stallName, ownerName, location, lowStockAlerts, currency, language } = req.body;
+    
+    let settings = await (prisma as any).stallSettings.findFirst();
+    if (!settings) {
+      settings = await (prisma as any).stallSettings.create({ data: {} });
+    }
+    
+    const updatedSettings = await (prisma as any).stallSettings.update({
+      where: { id: settings.id },
+      data: {
+        stallName: typeof stallName === 'string' ? stallName : settings.stallName,
+        ownerName: typeof ownerName === 'string' ? ownerName : settings.ownerName,
+        location: typeof location === 'string' ? location : settings.location,
+        lowStockAlerts: typeof lowStockAlerts === 'boolean' ? lowStockAlerts : settings.lowStockAlerts,
+        currency: typeof currency === 'string' ? currency : settings.currency,
+        language: typeof language === 'string' ? language : settings.language,
+      }
+    });
+    
+    return res.json(updatedSettings);
+  } catch (error) {
+    return sendInternalError(res, "Failed to update settings.", error);
   }
 });
 

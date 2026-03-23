@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import InventoryList from './components/InventoryList';
 import MenuManager from './components/MenuManager';
 import PriceComparison from './components/PriceComparison';
 import Settings from './components/Settings';
 import Login from './components/Login';
-import { Home, Package, ChefHat, BarChart3, SettingsIcon } from 'lucide-react';
+import { Home, Package, ChefHat, DollarSign, SettingsIcon } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'inventory' | 'menu' | 'analytics' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'inventory' | 'menu' | 'prices' | 'settings'>('home');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [inventorySubTab, setInventorySubTab] = useState<'stock' | 'restock'>('stock');
   const [menuSubTab, setMenuSubTab] = useState<'all' | 'work'>('all');
@@ -28,6 +28,10 @@ export default function App() {
     setInventorySubTab('restock');
   };
 
+  const navigateToPriceTracking = () => {
+    setActiveTab('prices');
+  };
+
   // Show login screen if not authenticated
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -36,17 +40,25 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
-        return <Dashboard onNavigateToWorkMode={navigateToWorkMode} onNavigateToRestock={navigateToRestock} />;
+        return <Dashboard 
+                 onNavigateToWorkMode={navigateToWorkMode} 
+                 onNavigateToRestock={navigateToRestock} 
+                 onNavigateToPriceTracking={navigateToPriceTracking} 
+               />;
       case 'inventory':
         return <InventoryList initialSubTab={inventorySubTab} onFormStateChange={setIsFormOpen} />;
       case 'menu':
         return <MenuManager initialSubTab={menuSubTab} onFormStateChange={setIsFormOpen} />;
-      case 'analytics':
+      case 'prices':
         return <PriceComparison onFormStateChange={setIsFormOpen} />;
       case 'settings':
         return <Settings />;
       default:
-        return <Dashboard onNavigateToWorkMode={navigateToWorkMode} onNavigateToRestock={navigateToRestock} />;
+        return <Dashboard 
+                 onNavigateToWorkMode={navigateToWorkMode} 
+                 onNavigateToRestock={navigateToRestock} 
+                 onNavigateToPriceTracking={navigateToPriceTracking} 
+               />;
     }
   };
 
@@ -92,13 +104,13 @@ export default function App() {
               <span className="text-xs font-bold">Menu</span>
             </button>
             <button
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => setActiveTab('prices')}
               className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-                activeTab === 'analytics' ? 'text-orange-500' : 'text-gray-600'
+                activeTab === 'prices' ? 'text-orange-500' : 'text-gray-600'
               }`}
             >
-              <BarChart3 size={24} strokeWidth={2.5} />
-              <span className="text-xs font-bold">Analytics</span>
+              <DollarSign size={24} strokeWidth={2.5} />
+              <span className="text-xs font-bold">Prices</span>
             </button>
             <button
               onClick={() => setActiveTab('settings')}

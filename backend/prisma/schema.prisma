@@ -84,3 +84,14 @@ model SaleRecord {
   @@index([menuItemId])
   @@index([timestamp])
 }
+
+model StallSettings {
+  id             String   @id @default(uuid())
+  stallName      String   @default("King Chicken Stall")
+  ownerName      String   @default("Owner")
+  location       String   @default("Block 123, Chinatown Food Centre")
+  lowStockAlerts Boolean  @default(true)
+  currency       String   @default("SGD")
+  language       String   @default("English")
+  updatedAt      DateTime @updatedAt
+}
