@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Edit2, Zap, ChevronDown, ChevronRight, Search, Mic, X } from 'lucide-react';
 import { dishCategories } from '../data/constants';
+import wontonmeeImg from '../assets/wontonmee.png';
+import roastedcrImg from '../assets/roastedcr.png';
+import currylaksaImg from '../assets/currylaksa.png';
+import cktImg from '../assets/ckt.png';
 import { CreateSalePayload, MenuItem, MenuItemPayload } from '../types/menu';
 import { InventoryItem } from '../types/inventory';
 import { createMenuItem, deleteMenuItem, getMenuItems, updateMenuItem } from '../services/menu';
@@ -40,6 +44,13 @@ declare global {
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   }
 }
+
+const LOCAL_IMAGES: Record<string, string> = {
+  'Wonton Mee': wontonmeeImg,
+  'Roasted Chicken Rice': roastedcrImg,
+  'Curry Laksa': currylaksaImg,
+  'Char Kway Teow': cktImg,
+};
 
 const SPOKEN_NUMBERS: Record<string, number> = {
   a: 1,
@@ -100,7 +111,7 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
   const [showEdit, setShowEdit] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [quickSaleItem, setQuickSaleItem] = useState<MenuItem | null>(null);
-  const activeTab = initialSubTab; // Use prop directly instead of state
+  const activeTab = initialSubTab;
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
@@ -359,10 +370,10 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
           )}
         
         {/* Search Bar */}
-        <div className="relative">
+        <div className="relative" style={{marginTop: '30px'}}>
           <Search 
             className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600" 
-            size={24}
+            size={20}
             strokeWidth={2.5}
           />
           <input
@@ -370,13 +381,13 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
             placeholder="Search dishes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-4 py-4 border-2 border-gray-300 rounded-lg font-bold text-lg focus:outline-none focus:border-orange-600"
+            className="w-full pl-12 pr-4 py-3  border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
+    
           />
         </div>
 
-        {/* Add New Dish Button - only shown in All Dishes tab */}
-        {activeTab === 'all' && (
-          <button
+        {/* Add New Dish Button */}
+        <button
             onClick={() => {
               setEditingItem(null);
               setShowEdit(true);
@@ -389,11 +400,10 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
             <Plus size={28} strokeWidth={2.5} />
             Add New Dish
           </button>
-        )}
       </div>
 
       {/* Menu Items by Category */}
-      <div className="space-y-3 mb-6">{dishCategories.map(category => {
+      <div className="space-y-2 mb-3">{dishCategories.map(category => {
           const items = groupedItems[category] || [];
           const itemCount = items.length;
           const isCollapsed = collapsedCategories.has(category);
@@ -403,15 +413,15 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
               {/* Collapsible Category Header */}
               <button
                 onClick={() => toggleCategoryCollapse(category)}
-                className="w-full bg-gray-100 border-2 border-gray-300 rounded-lg p-4 flex items-center justify-between active:bg-gray-200 transition-colors"
+                className="w-full bg-gray-100 border-2 border-gray-300 rounded-lg p-3 flex items-center justify-between active:bg-gray-200 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {isCollapsed ? (
-                    <ChevronRight size={24} className="text-gray-600" strokeWidth={2.5} />
+                    <ChevronRight size={20} className="text-gray-600" strokeWidth={2.5} />
                   ) : (
-                    <ChevronDown size={24} className="text-gray-600" strokeWidth={2.5} />
+                    <ChevronDown size={20} className="text-gray-600" strokeWidth={2.5} />
                   )}
-                  <h2 className="text-xl font-bold text-gray-900">{category}</h2>
+                  <h2 className="text-lg font-bold text-gray-900">{category}</h2>
                 </div>
                 <span className="text-orange-600 font-bold text-lg">
                   {itemCount} {itemCount === 1 ? 'dish' : 'dishes'}
@@ -445,9 +455,9 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                               <div className="flex items-center gap-3">
                                 {/* Dish Image */}
                                 <div className="flex-shrink-0">
-                                  {item.image ? (
+                                  {(item.image || LOCAL_IMAGES[item.name]) ? (
                                     <img
-                                      src={item.image}
+                                      src={item.image || LOCAL_IMAGES[item.name]}
                                       alt={item.name}
                                       className="w-16 h-16 rounded-lg border-2 border-gray-300 object-cover"
                                     />
@@ -491,7 +501,7 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                               {!isExpanded && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <p className="text-gray-600 font-bold text-xs">
-                                    {item.ingredients.length} ingredients
+                                    {item.ingredients.length} {item.ingredients.length === 1 ? 'ingredient' : 'ingredients'}
                                   </p>
                                   <span className="text-gray-400">•</span>
                                   <p className="text-gray-600 font-bold text-xs">

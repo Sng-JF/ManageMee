@@ -7,11 +7,12 @@ import { getSales } from '../services/sales';
 import type { MenuItem, SaleRecord } from '../types/menu';
 import DailyPrepForecast from './DailyPrepForecast';
 import SalesPrediction from './SalesPrediction';
+import PriceComparison from './PriceComparison';
 
 interface DashboardProps {
   onNavigateToWorkMode: () => void;
   onNavigateToRestock: () => void;
-  onNavigateToPriceTracking: () => void;
+  salesRefreshKey?: number;
 }
 
 export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock, salesRefreshKey = 0 }: DashboardProps) {
@@ -32,6 +33,8 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock, s
            dateA.getMonth() === dateB.getMonth() &&
            dateA.getDate() === dateB.getDate();
   };
+
+  const todayStr = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
   useEffect(() => {
     const fetchDashboardData = async () => {

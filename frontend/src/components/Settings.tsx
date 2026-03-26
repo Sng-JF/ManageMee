@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Globe, DollarSign, User, HelpCircle, LogOut, X, Save } from 'lucide-react';
 
+const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+
 interface SettingsData {
   stallName: string;
   ownerName: string;
@@ -18,7 +20,7 @@ export default function Settings() {
 
   // Fetch settings on mount
   useEffect(() => {
-    fetch('/api/settings')
+    fetch(`${API_BASE}/api/settings`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Network response was not ok");
         return res.json();
@@ -41,7 +43,7 @@ export default function Settings() {
     if (!formData) return;
     
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${API_BASE}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -102,9 +104,9 @@ export default function Settings() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto relative">
       {/* Header */}
-      <div className="mb-6">
-        <div className="bg-orange-600 rounded-lg p-4 mb-4">
-          <h1 className="text-3xl font-bold text-white">Settings</h1>
+      <div className="mb-3">
+        <div className="bg-orange-600 rounded-lg p-3 mb-2">
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
         </div>
         <div className="bg-orange-50 border-2 border-orange-600 rounded-lg p-4">
           <p className="font-bold text-gray-900 text-xl">{settings.stallName}</p>
@@ -123,9 +125,9 @@ export default function Settings() {
               onClick={() => option.id === 'help' ? alert('Help center coming soon!') : setActiveModal(option.id)}
               className="w-full bg-white border-2 border-gray-300 rounded-lg p-4 text-left active:bg-gray-50 transition-colors flex items-center justify-between"
             >
-              <div className="flex items-center gap-4">
-                <div className="bg-orange-100 p-3 rounded-lg">
-                  <Icon size={28} className="text-orange-600" strokeWidth={2.5} />
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-100 p-2 rounded-lg">
+                  <Icon size={22} className="text-orange-600" strokeWidth={2.5} />
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg">{option.title}</h3>

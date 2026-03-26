@@ -120,7 +120,9 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
     void loadMenuItems();
   }, [loadInventory, loadMenuItems]);
 
-  // Check for low stock items on mount - only show once per session
+
+
+  // Show low-stock alert once per session (fires after data loads)
   useEffect(() => {
     const hasShownAlert = sessionStorage.getItem('lowStockAlertShown');
     if (!hasShownAlert && items.length > 0) {
@@ -130,7 +132,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
         sessionStorage.setItem('lowStockAlertShown', 'true');
       }
     }
-  }, [items]);
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredItems = useMemo(
     () =>
@@ -319,6 +321,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
       <AddEditItem
         item={editingItem}
         onSave={editingItem ? handleEditItem : handleAddItem}
+        onDelete={editingItem ? handleDeleteItem : undefined}
         onCancel={handleClose}
         onDelete={handleDeleteItem}
         isDeleteDisabled={isEditingItemUsedInDish}
@@ -379,7 +382,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex-1 p-4 rounded-lg font-bold text-lg transition-colors ${
+            className={`flex-1 p-2 mt-2 mb-4 rounded-lg font-bold text-lg transition-colors ${
               activeTab === 'overview'
                 ? 'bg-orange-600 text-white'
                 : 'bg-gray-100 text-gray-600 active:bg-gray-200'
@@ -389,25 +392,18 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
           </button>
           <button
             onClick={() => setActiveTab('restock')}
-            className={`flex-1 p-4 rounded-lg font-bold text-lg transition-colors relative ${
+            className={`flex-1 p-2 mt-2 mb-4 rounded-lg font-bold text-lg transition-colors relative ${
               activeTab === 'restock'
                 ? 'bg-orange-600 text-white'
                 : 'bg-gray-100 text-gray-600 active:bg-gray-200'
             }`}
           >
             Restock
-            {lowStockCount > 0 && (
-              <span className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                activeTab === 'restock' ? 'bg-red-600 text-white' : 'bg-red-600 text-white'
-              }`}>
-                {lowStockCount}
-              </span>
-            )}
           </button>
         </div>
         
         {/* Search Bar */}
-        <div className="relative mb-4">
+        <div className="relative mb-4" style={{marginBottom: "30px"}}>
           <Search 
             className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600" 
             size={24}
@@ -418,7 +414,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
             placeholder="Search ingredients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-4 py-4 border-2 border-gray-300 rounded-lg font-bold text-lg focus:outline-none focus:border-orange-600"
+            className="w-full pl-14 pr-4 py-2 border-2 border-gray-300 rounded-lg font-bold text-lg focus:outline-none focus:border-orange-600"
           />
         </div>
 
@@ -572,7 +568,8 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
                           {activeTab === 'restock' && isLow && !hasPendingRestock && (
                             <button
                               onClick={() => handleRestockClick(item)}
-                              className="w-full bg-orange-600 text-white rounded-lg p-3 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
+                              className="w-full bg-orange-600 text-white rounded-lg p-2 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
+                              style={{marginTop: "25px"}}
                             >
                               <Package size={20} strokeWidth={2.5} />
                               Restock Now
@@ -716,7 +713,8 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
                             {!hasPendingRestock && (
                               <button
                                 onClick={() => handleRestockClick(item)}
-                                className="w-full bg-orange-600 text-white rounded-lg p-3 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
+                                className="w-full bg-orange-600 text-white rounded-lg p-2 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
+                                style={{marginTop: "25px"}}
                               >
                                 <Package size={20} strokeWidth={2.5} />
                                 Restock (Optional)

@@ -6,7 +6,7 @@ import { InventoryItem } from '../types/inventory';
 import LogPrice from './LogPrice';
 import AddEditItem from './AddEditItem';
 
-export default function PriceComparison({ onFormStateChange }: { onFormStateChange?: (isOpen: boolean) => void }) {
+export default function PriceComparison({ onFormStateChange, hideHeader }: { onFormStateChange?: (isOpen: boolean) => void; hideHeader?: boolean }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showLogPrice, setShowLogPrice] = useState(false);
@@ -92,7 +92,7 @@ export default function PriceComparison({ onFormStateChange }: { onFormStateChan
   }, {} as Record<string, typeof initialItems>);
 
   return (
-    <div className="p-4 pb-24">
+    <div className="p-3">
       {/* Header */}
       <div className="mb-6">
         <div className="bg-orange-500 rounded-lg p-4 mb-2">

@@ -1,4 +1,8 @@
 import { MenuItem } from '../types/menu';
+import roastedCrImg from '../assets/roastedcr.png';
+import cktImg from '../assets/ckt.png';
+import curryLaksaImg from '../assets/currylaksa.png';
+import wontonMeeImg from '../assets/wontonmee.png';
 
 export const menuItems: MenuItem[] = [
   {
@@ -6,6 +10,7 @@ export const menuItems: MenuItem[] = [
     name: 'Roasted Chicken Rice',
     price: 5.50,
     category: 'Rice Dishes',
+    image: roastedCrImg,
     ingredients: [
       { inventoryItemId: '5', inventoryItemName: 'Chicken Breast', quantity: 150, unit: 'g' },
       { inventoryItemId: '11', inventoryItemName: 'Brown Rice', quantity: 200, unit: 'g' },
@@ -18,6 +23,7 @@ export const menuItems: MenuItem[] = [
     name: 'Char Kway Teow',
     price: 6.00,
     category: 'Noodle Dishes',
+    image: cktImg,
     ingredients: [
       { inventoryItemId: '1', inventoryItemName: 'Yellow Noodles', quantity: 150, unit: 'g' },
       { inventoryItemId: '3', inventoryItemName: 'Eggs', quantity: 1, unit: 'pcs' },
@@ -31,6 +37,7 @@ export const menuItems: MenuItem[] = [
     name: 'Curry Laksa',
     price: 6.50,
     category: 'Noodle Dishes',
+    image: curryLaksaImg,
     ingredients: [
       { inventoryItemId: '1', inventoryItemName: 'Yellow Noodles', quantity: 180, unit: 'g' },
       { inventoryItemId: '4', inventoryItemName: 'Prawns', quantity: 60, unit: 'g' },
@@ -43,6 +50,7 @@ export const menuItems: MenuItem[] = [
     name: 'Wonton Mee',
     price: 5.00,
     category: 'Noodle Dishes',
+    image: wontonMeeImg,
     ingredients: [
       { inventoryItemId: '1', inventoryItemName: 'Yellow Noodles', quantity: 160, unit: 'g' },
       { inventoryItemId: '6', inventoryItemName: 'Bok Choy', quantity: 80, unit: 'g' },

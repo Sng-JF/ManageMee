@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import type { Response } from "express";
 import cors from "cors";
+import multer from "multer";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "./generated/prisma/client.js";
@@ -13,7 +14,8 @@ if (!connectionString) {
 }
 
 const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -25,6 +27,8 @@ type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
 
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const sendInternalError = (res: Response, message: string, error: unknown) => {
   console.error(message, error);
@@ -41,6 +45,19 @@ const isPrismaNotFound = (error: unknown) => {
 
 const normalizeString = (value: unknown) => {
   return typeof value === "string" ? value.trim() : "";
+};
+
+/**
+ * Returns the multiplication factor to convert `from` unit into `to` unit.
+ * Returns null if no conversion is possible (incompatible unit families).
+ */
+const getUnitConversionFactor = (from: string, to: string): number | null => {
+  if (from === to) return 1;
+  if (from === "g"  && to === "kg") return 0.001;
+  if (from === "kg" && to === "g")  return 1000;
+  if (from === "ml" && to === "L")  return 0.001;
+  if (from === "L"  && to === "ml") return 1000;
+  return null; // incompatible families (e.g. g vs L)
 };
 
 const normalizeNumber = (value: unknown) => {
@@ -1120,6 +1137,7 @@ app.get('/api/forecast/today', async (req, res) => {
     const dishSalesCounts: Record<string, { totalQuantity: number, menuItem: any }> = {};
 
     sameDaySales.forEach((sale) => {
+      if (!sale.menuItemId) return;
       const existingEntry = dishSalesCounts[sale.menuItemId];
 
       if (existingEntry) {
@@ -1218,6 +1236,65 @@ app.get('/api/forecast/today', async (req, res) => {
   } catch (error) {
     console.error('Forecast generation failed:', error);
     res.status(500).json({ error: 'Failed to generate demand forecast' });
+  }
+});
+
+// ─── Voice Transcription ────────────────────────────────────────────────────
+
+app.post('/api/voice/transcribe', upload.single('audio'), async (req: any, res: Response) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'No audio file provided' });
+    return;
+  }
+
+  const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: 'Google Cloud API key not configured. Set GOOGLE_CLOUD_API_KEY in backend .env' });
+    return;
+  }
+
+  const audioBase64 = req.file.buffer.toString('base64');
+  const mimeType: string = (req.body?.mimeType as string) || req.file.mimetype || 'audio/webm';
+
+  let encoding = 'WEBM_OPUS';
+  if (mimeType.includes('ogg')) encoding = 'OGG_OPUS';
+  else if (mimeType.includes('mp4') || mimeType.includes('m4a')) encoding = 'MP4';
+  else if (mimeType.includes('wav')) encoding = 'LINEAR16';
+  else if (mimeType.includes('flac')) encoding = 'FLAC';
+
+  const sttConfig: Record<string, unknown> = {
+    encoding,
+    languageCode: 'en-SG',
+    enableAutomaticPunctuation: true,
+  };
+  if (encoding === 'LINEAR16') {
+    sttConfig.sampleRateHertz = 16000;
+  }
+
+  try {
+    const sttResponse = await fetch(
+      `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: sttConfig,
+          audio: { content: audioBase64 },
+        }),
+      }
+    );
+
+    if (!sttResponse.ok) {
+      const errorBody = await sttResponse.json().catch(() => ({}));
+      sendInternalError(res, 'Google STT API returned an error', errorBody);
+      return;
+    }
+
+    const data: any = await sttResponse.json();
+    const transcript: string = data.results?.[0]?.alternatives?.[0]?.transcript ?? '';
+    res.json({ transcript });
+  } catch (error) {
+    sendInternalError(res, 'Failed to transcribe audio', error);
   }
 });
 

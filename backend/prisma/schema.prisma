@@ -74,12 +74,12 @@ model RecipeIngredient {
 
 model SaleRecord {
   id           String   @id @default(uuid())
-  menuItemId   String
+  menuItemId   String?
   menuItemName String
   quantity     Int
   timestamp    DateTime @default(now())
 
-  menuItem     MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  menuItem     MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
 
   @@index([menuItemId])
   @@index([timestamp])
