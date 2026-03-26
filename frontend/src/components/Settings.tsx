@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Globe, DollarSign, User, HelpCircle, LogOut, X, Save } from 'lucide-react';
 
+const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+
 interface SettingsData {
   stallName: string;
   ownerName: string;
@@ -18,7 +20,7 @@ export default function Settings() {
 
   // Fetch settings on mount
   useEffect(() => {
-    fetch('/api/settings')
+    fetch(`${API_BASE}/api/settings`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Network response was not ok");
         return res.json();
@@ -41,7 +43,7 @@ export default function Settings() {
     if (!formData) return;
     
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${API_BASE}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

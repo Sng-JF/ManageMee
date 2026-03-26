@@ -1,12 +1,26 @@
 import { ReactNode, useEffect, useState } from 'react';
 
+const isMobileDevice = () =>
+  window.innerWidth <= 480 ||
+  /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 export default function IPhoneFrame({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(new Date());
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    setIsMobile(isMobileDevice());
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  if (isMobile) {
+    return (
+      <div style={{ width: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+        {children}
+      </div>
+    );
+  }
 
   const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s?(AM|PM)$/i, '');
 
