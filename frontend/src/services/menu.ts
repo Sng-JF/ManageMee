@@ -19,8 +19,11 @@ export function updateMenuItem(id: string, payload: MenuItemPayload) {
   });
 }
 
-export function deleteMenuItem(id: string) {
-  return apiRequest<MenuItem>(`/api/menu/${id}`, {
+export function deleteMenuItem(
+  id: string,
+  salesAction: 'keep' | 'delete' = 'keep'
+) {
+  return apiRequest(`/api/menu/${id}?salesAction=${salesAction}`, {
     method: 'DELETE',
   });
 }

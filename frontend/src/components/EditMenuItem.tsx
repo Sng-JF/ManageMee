@@ -8,14 +8,14 @@ interface EditMenuItemProps {
   inventoryItems: InventoryItem[];
   onSave: (item: MenuItem | MenuItemPayload) => void | Promise<void>;
   onCancel: () => void;
-  onDelete?: (id: string) => void | Promise<void>;
+  onDelete?: (id: string, salesAction: 'keep' | 'delete') => void | Promise<void>;
 }
 
 const normalizeToSmallestUnit = (quantity: number, unit: string) => {
   if (unit === 'kg') return { quantity: quantity * 1000, unit: 'g' };
   if (unit === 'L') return { quantity: quantity * 1000, unit: 'ml' };
   return { quantity, unit };
-};
+}
 
 export default function EditMenuItem({ item, inventoryItems, onSave, onCancel, onDelete }: EditMenuItemProps) {
   const [dishName, setDishName] = useState(item?.name || '');
@@ -478,26 +478,45 @@ export default function EditMenuItem({ item, inventoryItems, onSave, onCancel, o
         {/* Delete Confirmation */}
         {showDeleteConfirm && (
           <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Confirm Delete</h2>
-              <p className="text-gray-600 mb-6">Are you sure you want to delete this dish?</p>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="bg-gray-600 text-white rounded-lg p-3 font-bold active:bg-gray-700 transition-colors mr-3"
-                >
-                  Cancel
-                </button>
+              <p className="text-gray-600 mb-3">
+                Are you sure you want to delete this dish from your menu.
+              </p>
+              <p className="text-gray-600 mb-6">
+                If this dish has sales history, do you want to keep those sales records or delete them too?
+              </p>
+
+              <div className="flex flex-col gap-3">
                 <button
                   onClick={async () => {
                     if (item && onDelete) {
-                      await onDelete(item.id);
+                      await onDelete(item.id, 'keep');
                     }
                     setShowDeleteConfirm(false);
                   }}
-                  className="bg-red-600 text-white rounded-lg p-3 font-bold active:bg-red-700 transition-colors"
+                  className="w-full bg-orange-600 text-white rounded-lg p-3 font-bold active:bg-orange-700 transition-colors"
                 >
-                  Delete
+                  Delete Dish, Keep Sales History
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (item && onDelete) {
+                      await onDelete(item.id, 'delete');
+                    }
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="w-full bg-red-600 text-white rounded-lg p-3 font-bold active:bg-red-700 transition-colors"
+                >
+                  Delete Dish and Sales History
+                </button>
+
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full bg-gray-600 text-white rounded-lg p-3 font-bold active:bg-gray-700 transition-colors"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

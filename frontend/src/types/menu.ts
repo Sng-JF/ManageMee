@@ -18,9 +18,10 @@ export interface MenuItem {
 export type MenuItemPayload = Omit<MenuItem, 'id'>;
 
 export interface SaleRecord {
-  id?: string;
-  menuItemId: string;
+  id: string;
+  menuItemId: string | null;
   menuItemName: string;
+  menuItemPrice: number;
   quantity: number;
   timestamp: string;
 }

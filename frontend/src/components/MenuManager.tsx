@@ -197,12 +197,17 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (
+    id: string,
+    salesAction: 'keep' | 'delete'
+  ) => {
     try {
-      await deleteMenuItem(id);
+      await deleteMenuItem(id, salesAction);
       setMenuItems((prev) => prev.filter((menuItem) => menuItem.id !== id));
       setShowEdit(false);
       setEditingItem(null);
+      onSaleRecorded?.();
+
       if (onFormStateChange) {
         onFormStateChange(false);
       }

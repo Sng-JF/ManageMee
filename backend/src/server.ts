@@ -656,20 +656,35 @@ app.put("/api/menu/:id", async (req, res) => {
 });
 
 app.delete("/api/menu/:id", async (req, res) => {
+  const salesAction =
+    req.query.salesAction === "delete" ? "delete" : "keep";
+
   try {
-    const salesCount = await prisma.saleRecord.count({
-      where: { menuItemId: req.params.id },
-    });
-
-    if (salesCount > 0) {
-      return res.status(409).json({
-        error: "Cannot delete menu item because it already has sales history.",
-      });
-    }
-
-    const deletedMenuItem = await prisma.menuItem.delete({
+    const existingMenuItem = await prisma.menuItem.findUnique({
       where: { id: req.params.id },
       include: { ingredients: true },
+    });
+
+    if (!existingMenuItem) {
+      return res.status(404).json({ error: "Menu item not found." });
+    }
+
+    const deletedMenuItem = await prisma.$transaction(async (tx) => {
+      if (salesAction === "delete") {
+        await tx.saleRecord.deleteMany({
+          where: { menuItemId: req.params.id },
+        });
+      } else {
+        await tx.saleRecord.updateMany({
+          where: { menuItemId: req.params.id },
+          data: { menuItemId: null },
+        });
+      }
+
+      return tx.menuItem.delete({
+        where: { id: req.params.id },
+        include: { ingredients: true },
+      });
     });
 
     return res.json(deletedMenuItem);
@@ -1012,8 +1027,11 @@ app.post("/api/sales", async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const sale = await tx.saleRecord.create({
         data: {
+          ...{
           ...payload.data,
+          menuItemPrice: menuItem.price,
           timestamp: new Date(), // explicitly set so the DB stores the correct UTC moment
+        },
         },
       });
 
@@ -1093,11 +1111,10 @@ app.get('/api/forecast/today', async (req, res) => {
       }
     });
 
-    // Filter to same day-of-week in SGT
-    const sameDaySales = historicalSales.filter(sale => {
-      const saleSgt = new Date(new Date(sale.timestamp).getTime() + SGT_OFFSET_MS);
-      return saleSgt.getUTCDay() === currentDayOfWeek;
-    });
+    // 2. Filter historical sales strictly to the same day of the week
+    const sameDaySales = historicalSales.filter(
+      sale => new Date(sale.timestamp).getDay() === currentDayOfWeek
+    );
 
     // 3. Aggregate total portions sold per menu item
     const dishSalesCounts: Record<string, { totalQuantity: number, menuItem: any }> = {};

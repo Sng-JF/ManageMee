@@ -61,7 +61,7 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock, s
               hour: 'numeric',
               minute: '2-digit',
             }),
-            total: (priceByMenuItemId.get(sale.menuItemId) ?? 0) * sale.quantity,
+            total: sale.menuItemPrice * sale.quantity,
             quantity: sale.quantity,
           })),
         );
