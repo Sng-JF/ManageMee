@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Globe, DollarSign, User, HelpCircle, LogOut, X, Save } from 'lucide-react';
+import { apiRequest } from '../services/api';
 
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+// const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 interface SettingsData {
   stallName: string;
@@ -12,55 +13,88 @@ interface SettingsData {
   language: string;
 }
 
-export default function Settings() {
+interface SettingsProps {
+  onLogout: () => void;
+}
+
+export default function Settings({ onLogout }: SettingsProps) {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [formData, setFormData] = useState<SettingsData | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Fetch settings on mount
-  useEffect(() => {
-    fetch(`${API_BASE}/api/settings`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Network response was not ok");
-        return res.json();
-      })
-      .then(data => {
-        setSettings(data);
-        setFormData(data);
-      })
-      .catch(err => {
-        console.error("Failed to fetch settings", err);
-        // Optionally add an error state here (e.g., setError(true))
-      })
-      .finally(() => {
-        // This ensures the loading state stops whether the request succeeds or fails
-        setIsLoading(false); 
+useEffect(() => {
+  apiRequest<SettingsData & {
+    stallCategories?: string[];
+    ingredientCategories?: string[];
+  }>('/api/settings')
+    .then((data) => {
+      setSettings({
+        stallName: data.stallName,
+        ownerName: data.ownerName,
+        location: data.location,
+        lowStockAlerts: data.lowStockAlerts,
+        currency: data.currency,
+        language: data.language,
       });
-  }, []);
+      setFormData({
+        stallName: data.stallName,
+        ownerName: data.ownerName,
+        location: data.location,
+        lowStockAlerts: data.lowStockAlerts,
+        currency: data.currency,
+        language: data.language,
+      });
+      setError('');
+    })
+    .catch((err) => {
+      console.error('Failed to fetch settings', err);
+      setError(err instanceof Error ? err.message : 'Failed to load settings.');
+    })
+    .finally(() => {
+      setIsLoading(false);
+    });
+}, []);
 
   const handleSave = async () => {
     if (!formData) return;
-    
+
     try {
-      const res = await fetch(`${API_BASE}/api/settings`, {
+      const updated = await apiRequest<SettingsData>('/api/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
-      
-      if (res.ok) {
-        const updated = await res.json();
-        setSettings(updated);
-        setActiveModal(null);
-      }
+
+      setSettings(updated);
+      setFormData(updated);
+      setActiveModal(null);
+      setError('');
     } catch (error) {
-      console.error("Failed to save settings", error);
+      console.error('Failed to save settings', error);
+      setError(error instanceof Error ? error.message : 'Failed to save settings.');
     }
   };
 
-  if (isLoading || !settings || !formData) {
+  if (isLoading) {
     return <div className="p-4 text-center font-bold text-gray-500 mt-10">Loading settings...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-center mt-10">
+        <p className="font-bold text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!settings || !formData) {
+    return (
+      <div className="p-4 text-center font-bold text-gray-500 mt-10">
+        Settings unavailable.
+      </div>
+    );
   }
 
   const settingsOptions = [
@@ -149,7 +183,7 @@ export default function Settings() {
 
       {/* Logout Button */}
       <button
-        onClick={() => alert('Logging out...')}
+        onClick={onLogout}
         className="w-full bg-red-50 border-2 border-red-200 text-red-600 rounded-lg p-4 font-bold text-lg flex items-center justify-center gap-3 active:bg-red-100 transition-colors"
       >
         <LogOut size={24} strokeWidth={2.5} />

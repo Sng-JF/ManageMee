@@ -3,13 +3,16 @@ import Dashboard from './components/Dashboard';
 import InventoryList from './components/InventoryList';
 import MenuManager from './components/MenuManager';
 import Settings from './components/Settings';
-import Login from './components/Login';
+// import Login from './components/Login';
+import Landing from './components/Landing';
 import IPhoneFrame from './components/IPhoneFrame';
 import { Home, Package, ChefHat, SettingsIcon } from 'lucide-react';
+import { getStoredAuthSession } from './services/auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'inventory' | 'menu' | 'settings'>('home');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredAuthSession()));
   const [inventorySubTab, setInventorySubTab] = useState<'stock' | 'restock'>('stock');
   const [menuSubTab, setMenuSubTab] = useState<'all' | 'work'>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -17,6 +20,16 @@ export default function App() {
 
   const handleLogin = () => {
     setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('managemee-auth');
+    setIsAuthenticated(false);
+    setActiveTab('home');
+    setInventorySubTab('stock');
+    setMenuSubTab('all');
+    setIsFormOpen(false);
+    setSalesRefreshKey(0);
   };
 
   const navigateToWorkMode = () => {
@@ -32,9 +45,9 @@ export default function App() {
   // Show login screen if not authenticated
   if (!isAuthenticated) {
     return (
-      <IPhoneFrame>
-        <Login onLogin={handleLogin} />
-      </IPhoneFrame>
+      // <IPhoneFrame>
+      <Landing onLogin={handleLogin} />
+      // </IPhoneFrame>
     );
   }
 
@@ -60,7 +73,7 @@ export default function App() {
                  }}
                />;
       case 'settings':
-        return <Settings />;
+        return <Settings onLogout={handleLogout}/>;
       default:
         return <Dashboard 
                  onNavigateToWorkMode={navigateToWorkMode} 

@@ -7,8 +7,40 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stalls       Stall[]
+}
+
+model Stall {
+  id                   String   @id @default(uuid())
+  ownerId              String
+  stallName            String
+  location             String
+  stallCategories      String[]
+  ingredientCategories String[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  settings       StallSettings?
+  inventoryItems InventoryItem[]
+  suppliers      Supplier[]
+  menuItems      MenuItem[]
+  sales          SaleRecord[]
+
+  @@index([ownerId])
+}
+
 model InventoryItem {
   id              String             @id @default(uuid())
+  stallId         String
   name            String
   category        String
   quantity        Float
@@ -19,16 +51,25 @@ model InventoryItem {
   targetPrice     Float
   pendingRestock  Json?
   image           String?
+
+  stall           Stall              @relation(fields: [stallId], references: [id], onDelete: Cascade)
   menuIngredients RecipeIngredient[]
   supplierPrices  SupplierPrice[]
+
+  @@index([stallId])
 }
 
 model Supplier {
-  id     String          @id @default(uuid())
-  name   String
-  phone  String
-  items  String[]
-  prices SupplierPrice[]
+  id      String          @id @default(uuid())
+  stallId String
+  name    String
+  phone   String
+  items   String[]
+
+  stall   Stall           @relation(fields: [stallId], references: [id], onDelete: Cascade)
+  prices  SupplierPrice[]
+
+  @@index([stallId])
 }
 
 model SupplierPrice {
@@ -48,13 +89,17 @@ model SupplierPrice {
 
 model MenuItem {
   id          String             @id @default(uuid())
+  stallId     String
   name        String
   price       Float
   category    String
   image       String?
 
+  stall       Stall              @relation(fields: [stallId], references: [id], onDelete: Cascade)
   ingredients RecipeIngredient[]
   sales       SaleRecord[]
+
+  @@index([stallId])
 }
 
 model RecipeIngredient {
@@ -73,25 +118,29 @@ model RecipeIngredient {
 }
 
 model SaleRecord {
-  id           String   @id @default(uuid())
-  menuItemId   String?
-  menuItemName String
-  quantity     Int
-  timestamp    DateTime @default(now())
+  id            String    @id @default(uuid())
+  stallId       String
+  menuItemId    String?
+  menuItemName  String
+  menuItemPrice Float
+  quantity      Int
+  timestamp     DateTime  @default(now())
 
-  menuItem     MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  stall         Stall     @relation(fields: [stallId], references: [id], onDelete: Cascade)
+  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
 
+  @@index([stallId])
   @@index([menuItemId])
   @@index([timestamp])
 }
 
 model StallSettings {
   id             String   @id @default(uuid())
-  stallName      String   @default("King Chicken Stall")
-  ownerName      String   @default("Owner")
-  location       String   @default("Block 123, Chinatown Food Centre")
+  stallId        String   @unique
   lowStockAlerts Boolean  @default(true)
   currency       String   @default("SGD")
   language       String   @default("English")
   updatedAt      DateTime @updatedAt
+
+  stall          Stall    @relation(fields: [stallId], references: [id], onDelete: Cascade)
 }

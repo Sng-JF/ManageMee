@@ -1,11 +1,13 @@
 import "dotenv/config";
 import express from "express";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import cors from "cors";
 import multer from "multer";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "./generated/prisma/client.js";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -24,6 +26,7 @@ type ValidationFailure = { error: string };
 type ValidationSuccess<T> = { data: T };
 type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
 
+const scryptAsync = promisify(scryptCallback);
 
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
@@ -82,6 +85,36 @@ const normalizeStringArray = (value: unknown) => {
     .map((item) => normalizeString(item))
     .filter((item) => item.length > 0);
 };
+const normalizeBoolean = (value: unknown) => {
+  return typeof value === "boolean" ? value : null;
+};
+
+const getRequiredStallId = (req: Request) => {
+  const stallId = normalizeString(req.header("x-stall-id"));
+  return stallId.length > 0 ? stallId : null;
+};
+
+const hashPassword = async (password: string) => {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${derivedKey.toString("hex")}`;
+};
+
+const verifyPassword = async (password: string, storedHash: string) => {
+  const [salt, key] = storedHash.split(":");
+  if (!salt || !key) {
+    return false;
+  }
+
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  const storedKeyBuffer = Buffer.from(key, "hex");
+
+  return (
+    derivedKey.length === storedKeyBuffer.length &&
+    timingSafeEqual(derivedKey, storedKeyBuffer)
+  );
+};
+
 
 const normalizePendingRestock = (value: unknown) => {
   if (!isObject(value)) {
@@ -197,9 +230,25 @@ const validateInventoryPayload = (body: unknown): ValidationResult<InventoryPayl
   };
 };
 
-const toInventoryItemData = (
-  payload: InventoryPayload
-): Prisma.InventoryItemCreateInput => {
+const toInventoryItemCreateData = (stallId: string, payload: InventoryPayload) => {
+  return {
+    stallId,
+    name: payload.name,
+    category: payload.category,
+    quantity: roundQuantity(payload.quantity),
+    unit: payload.unit,
+    minQuantity: roundQuantity(payload.minQuantity),
+    supplier: payload.supplier,
+    targetPrice: payload.targetPrice,
+    image: payload.image,
+    pendingRestock:
+      payload.pendingRestock === null
+        ? Prisma.DbNull
+        : (payload.pendingRestock as Prisma.InputJsonObject),
+  };
+};
+
+const toInventoryItemUpdateData = (payload: InventoryPayload) => {
   return {
     name: payload.name,
     category: payload.category,
@@ -393,38 +442,344 @@ const validateSalePayload = (body: unknown): ValidationResult<SalePayload> => {
   };
 };
 
+
+type SignupPayload = {
+  email: string;
+  password: string;
+  name: string;
+  stallName: string;
+  location: string;
+  stallCategories: string[];
+  ingredientCategories: string[];
+};
+
+const validateSignupPayload = (body: unknown): ValidationResult<SignupPayload> => {
+  if (!isObject(body)) {
+    return { error: "Request body must be an object." };
+  }
+
+  const email = normalizeString(body.email).toLowerCase();
+  const password = normalizeString(body.password);
+  const name = normalizeString(body.name);
+  const stallName = normalizeString(body.stallName);
+  const location = normalizeString(body.location);
+  const stallCategories = normalizeStringArray(body.stallCategories);
+  const ingredientCategories = normalizeStringArray(body.ingredientCategories);
+
+  if (!email || !email.includes("@")) {
+    return { error: "A valid email is required." };
+  }
+
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters long." };
+  }
+
+  if (!name || !stallName || !location) {
+    return { error: "name, stallName, and location are required." };
+  }
+
+  if (stallCategories.length === 0) {
+    return { error: "At least one stall category is required." };
+  }
+
+  if (ingredientCategories.length === 0) {
+    return { error: "At least one ingredient category is required." };
+  }
+
+  return {
+    data: {
+      email,
+      password,
+      name,
+      stallName,
+      location,
+      stallCategories,
+      ingredientCategories,
+    },
+  };
+};
+
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+const validateLoginPayload = (body: unknown): ValidationResult<LoginPayload> => {
+  if (!isObject(body)) {
+    return { error: "Request body must be an object." };
+  }
+
+  const email = normalizeString(body.email).toLowerCase();
+  const password = normalizeString(body.password);
+
+  if (!email || !email.includes("@")) {
+    return { error: "A valid email is required." };
+  }
+
+  if (!password) {
+    return { error: "password is required." };
+  }
+
+  return { data: { email, password } };
+};
+
+type SettingsPayload = {
+  ownerName?: string;
+  stallName?: string;
+  location?: string;
+  stallCategories?: string[];
+  ingredientCategories?: string[];
+  lowStockAlerts?: boolean;
+  currency?: string;
+  language?: string;
+};
+
+const validateSettingsPayload = (body: unknown): ValidationResult<SettingsPayload> => {
+  if (!isObject(body)) {
+    return { error: "Request body must be an object." };
+  }
+
+  const data: SettingsPayload = {};
+
+  if ("ownerName" in body) {
+    const ownerName = normalizeString(body.ownerName);
+    if (!ownerName) {
+      return { error: "ownerName must be a non-empty string." };
+    }
+    data.ownerName = ownerName;
+  }
+
+  if ("stallName" in body) {
+    const stallName = normalizeString(body.stallName);
+    if (!stallName) {
+      return { error: "stallName must be a non-empty string." };
+    }
+    data.stallName = stallName;
+  }
+
+  if ("location" in body) {
+    const location = normalizeString(body.location);
+    if (!location) {
+      return { error: "location must be a non-empty string." };
+    }
+    data.location = location;
+  }
+
+  if ("stallCategories" in body) {
+    data.stallCategories = normalizeStringArray(body.stallCategories);
+  }
+
+  if ("ingredientCategories" in body) {
+    data.ingredientCategories = normalizeStringArray(body.ingredientCategories);
+  }
+
+  if ("lowStockAlerts" in body) {
+    const lowStockAlerts = normalizeBoolean(body.lowStockAlerts);
+    if (lowStockAlerts === null) {
+      return { error: "lowStockAlerts must be a boolean." };
+    }
+    data.lowStockAlerts = lowStockAlerts;
+  }
+
+  if ("currency" in body) {
+    const currency = normalizeString(body.currency);
+    if (!currency) {
+      return { error: "currency must be a non-empty string." };
+    }
+    data.currency = currency;
+  }
+
+  if ("language" in body) {
+    const language = normalizeString(body.language);
+    if (!language) {
+      return { error: "language must be a non-empty string." };
+    }
+    data.language = language;
+  }
+
+  return { data };
+};
+
 app.get("/api/health", async (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/inventory/low-stock", async (_req, res) => {
+app.post("/api/auth/signup", async (req, res) => {
+  const payload = validateSignupPayload(req.body);
+  if ("error" in payload) {
+    return res.status(400).json({ error: payload.error });
+  }
+
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: payload.data.email },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+
+    const passwordHash = await hashPassword(payload.data.password);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: payload.data.email,
+          passwordHash,
+          name: payload.data.name,
+        },
+      });
+
+      const stall = await tx.stall.create({
+        data: {
+          ownerId: user.id,
+          stallName: payload.data.stallName,
+          location: payload.data.location,
+          stallCategories: payload.data.stallCategories,
+          ingredientCategories: payload.data.ingredientCategories,
+        },
+      });
+
+      const settings = await tx.stallSettings.create({
+        data: {
+          stallId: stall.id,
+          lowStockAlerts: true,
+          currency: "SGD",
+          language: "English",
+        },
+      });
+
+      return { user, stall, settings };
+    });
+
+    return res.status(201).json({
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+      },
+      stall: {
+        id: result.stall.id,
+        stallName: result.stall.stallName,
+        location: result.stall.location,
+        stallCategories: result.stall.stallCategories,
+        ingredientCategories: result.stall.ingredientCategories,
+      },
+      settings: {
+        lowStockAlerts: result.settings.lowStockAlerts,
+        currency: result.settings.currency,
+        language: result.settings.language,
+      },
+    });
+  } catch (error) {
+    return sendInternalError(res, "Failed to create account.", error);
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const payload = validateLoginPayload(req.body);
+  if ("error" in payload) {
+    return res.status(400).json({ error: payload.error });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: payload.data.email },
+      include: {
+        stalls: {
+          include: {
+            settings: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const passwordMatches = await verifyPassword(payload.data.password, user.passwordHash);
+    if (!passwordMatches) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const primaryStall = user.stalls[0] ?? null;
+
+    return res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      stall: primaryStall
+        ? {
+            id: primaryStall.id,
+            stallName: primaryStall.stallName,
+            location: primaryStall.location,
+            stallCategories: primaryStall.stallCategories,
+            ingredientCategories: primaryStall.ingredientCategories,
+          }
+        : null,
+      settings: primaryStall?.settings
+        ? {
+            lowStockAlerts: primaryStall.settings.lowStockAlerts,
+            currency: primaryStall.settings.currency,
+            language: primaryStall.settings.language,
+          }
+        : null,
+    });
+  } catch (error) {
+    return sendInternalError(res, "Failed to log in.", error);
+  }
+});
+
+
+app.get("/api/inventory/low-stock", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
     const items = await prisma.inventoryItem.findMany({
+      where: { stallId },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
     const lowStockItems = items.filter((item) => item.quantity < item.minQuantity);
-    res.json(lowStockItems);
+    return res.json(lowStockItems);
   } catch (error) {
-    sendInternalError(res, "Failed to fetch low stock inventory.", error);
+    return sendInternalError(res, "Failed to fetch low stock inventory.", error);
   }
 });
 
-app.get("/api/inventory", async (_req, res) => {
+app.get("/api/inventory", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
     const items = await prisma.inventoryItem.findMany({
+      where: { stallId },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
-    res.json(items);
+    return res.json(items);
   } catch (error) {
-    sendInternalError(res, "Failed to fetch inventory.", error);
+    return sendInternalError(res, "Failed to fetch inventory.", error);
   }
 });
 
 app.get("/api/inventory/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const item = await prisma.inventoryItem.findUnique({
-      where: { id: req.params.id },
+    const item = await prisma.inventoryItem.findFirst({
+      where: { id: req.params.id, stallId },
     });
 
     if (!item) {
@@ -438,6 +793,11 @@ app.get("/api/inventory/:id", async (req, res) => {
 });
 
 app.post("/api/inventory", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateInventoryPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
@@ -445,7 +805,7 @@ app.post("/api/inventory", async (req, res) => {
 
   try {
     const newItem = await prisma.inventoryItem.create({
-      data: toInventoryItemData(payload.data),
+      data: toInventoryItemCreateData(stallId, payload.data),
     });
 
     return res.status(201).json(newItem);
@@ -455,28 +815,43 @@ app.post("/api/inventory", async (req, res) => {
 });
 
 app.put("/api/inventory/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateInventoryPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
   }
 
   try {
+    const existingItem = await prisma.inventoryItem.findFirst({
+      where: { id: req.params.id, stallId },
+      select: { id: true },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({ error: "Inventory item not found." });
+    }
+
     const updatedItem = await prisma.inventoryItem.update({
       where: { id: req.params.id },
-      data: toInventoryItemData(payload.data),
+      data: toInventoryItemUpdateData(payload.data),
     });
 
     return res.json(updatedItem);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Inventory item not found." });
-    }
-
     return sendInternalError(res, "Failed to update inventory item.", error);
   }
 });
 
 app.patch("/api/inventory/:id/quantity", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const quantityDelta = normalizeNumber(isObject(req.body) ? req.body.quantityDelta : undefined);
 
   if (!Number.isFinite(quantityDelta)) {
@@ -484,8 +859,8 @@ app.patch("/api/inventory/:id/quantity", async (req, res) => {
   }
 
   try {
-    const existingItem = await prisma.inventoryItem.findUnique({
-      where: { id: req.params.id },
+    const existingItem = await prisma.inventoryItem.findFirst({
+      where: { id: req.params.id, stallId },
       select: { quantity: true },
     });
 
@@ -502,16 +877,26 @@ app.patch("/api/inventory/:id/quantity", async (req, res) => {
 
     return res.json(updatedItem);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Inventory item not found." });
-    }
-
     return sendInternalError(res, "Failed to update inventory quantity.", error);
   }
 });
 
 app.delete("/api/inventory/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
+    const existingItem = await prisma.inventoryItem.findFirst({
+      where: { id: req.params.id, stallId },
+      select: { id: true },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({ error: "Inventory item not found." });
+    }
+
     const recipeCount = await prisma.recipeIngredient.count({
       where: { inventoryItemId: req.params.id },
     });
@@ -532,17 +917,19 @@ app.delete("/api/inventory/:id", async (req, res) => {
 
     return res.json(deletedItem);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Inventory item not found." });
-    }
-
     return sendInternalError(res, "Failed to delete inventory item.", error);
   }
 });
 
-app.get("/api/menu", async (_req, res) => {
+app.get("/api/menu", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
     const menuItems = await prisma.menuItem.findMany({
+      where: { stallId },
       include: { ingredients: true },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
@@ -554,9 +941,14 @@ app.get("/api/menu", async (_req, res) => {
 });
 
 app.get("/api/menu/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { id: req.params.id },
+    const menuItem = await prisma.menuItem.findFirst({
+      where: { id: req.params.id, stallId },
       include: { ingredients: true },
     });
 
@@ -571,6 +963,11 @@ app.get("/api/menu/:id", async (req, res) => {
 });
 
 app.post("/api/menu", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateMenuPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
@@ -579,18 +976,19 @@ app.post("/api/menu", async (req, res) => {
   try {
     const inventoryIds = payload.data.ingredients.map((ingredient) => ingredient.inventoryItemId);
     const inventoryItems = await prisma.inventoryItem.findMany({
-      where: { id: { in: inventoryIds } },
+      where: { stallId, id: { in: inventoryIds } },
       select: { id: true },
     });
 
     if (inventoryItems.length !== inventoryIds.length) {
       return res.status(400).json({
-        error: "One or more ingredients reference inventory items that do not exist.",
+        error: "One or more ingredients reference inventory items that do not exist for this stall.",
       });
     }
 
     const newMenuItem = await prisma.menuItem.create({
       data: {
+        stallId,
         name: payload.data.name,
         category: payload.data.category,
         price: payload.data.price,
@@ -609,21 +1007,35 @@ app.post("/api/menu", async (req, res) => {
 });
 
 app.put("/api/menu/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateMenuPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
   }
 
   try {
+    const existingMenuItem = await prisma.menuItem.findFirst({
+      where: { id: req.params.id, stallId },
+      select: { id: true },
+    });
+
+    if (!existingMenuItem) {
+      return res.status(404).json({ error: "Menu item not found." });
+    }
+
     const inventoryIds = payload.data.ingredients.map((ingredient) => ingredient.inventoryItemId);
     const inventoryItems = await prisma.inventoryItem.findMany({
-      where: { id: { in: inventoryIds } },
+      where: { stallId, id: { in: inventoryIds } },
       select: { id: true },
     });
 
     if (inventoryItems.length !== inventoryIds.length) {
       return res.status(400).json({
-        error: "One or more ingredients reference inventory items that do not exist.",
+        error: "One or more ingredients reference inventory items that do not exist for this stall.",
       });
     }
 
@@ -664,21 +1076,22 @@ app.put("/api/menu/:id", async (req, res) => {
 
     return res.json(updatedMenuItem);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Menu item not found." });
-    }
-
     return sendInternalError(res, "Failed to update menu item.", error);
   }
 });
 
 app.delete("/api/menu/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const salesAction =
     req.query.salesAction === "delete" ? "delete" : "keep";
 
   try {
-    const existingMenuItem = await prisma.menuItem.findUnique({
-      where: { id: req.params.id },
+    const existingMenuItem = await prisma.menuItem.findFirst({
+      where: { id: req.params.id, stallId },
       include: { ingredients: true },
     });
 
@@ -689,11 +1102,11 @@ app.delete("/api/menu/:id", async (req, res) => {
     const deletedMenuItem = await prisma.$transaction(async (tx) => {
       if (salesAction === "delete") {
         await tx.saleRecord.deleteMany({
-          where: { menuItemId: req.params.id },
+          where: { stallId, menuItemId: req.params.id },
         });
       } else {
         await tx.saleRecord.updateMany({
-          where: { menuItemId: req.params.id },
+          where: { stallId, menuItemId: req.params.id },
           data: { menuItemId: null },
         });
       }
@@ -706,17 +1119,19 @@ app.delete("/api/menu/:id", async (req, res) => {
 
     return res.json(deletedMenuItem);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Menu item not found." });
-    }
-
     return sendInternalError(res, "Failed to delete menu item.", error);
   }
 });
 
-app.get("/api/suppliers", async (_req, res) => {
+app.get("/api/suppliers", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: { stallId },
       orderBy: { name: "asc" },
     });
 
@@ -727,9 +1142,14 @@ app.get("/api/suppliers", async (_req, res) => {
 });
 
 app.get("/api/suppliers/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const supplier = await prisma.supplier.findUnique({
-      where: { id: req.params.id },
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: req.params.id, stallId },
     });
 
     if (!supplier) {
@@ -743,6 +1163,11 @@ app.get("/api/suppliers/:id", async (req, res) => {
 });
 
 app.post("/api/suppliers", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateSupplierPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
@@ -750,7 +1175,10 @@ app.post("/api/suppliers", async (req, res) => {
 
   try {
     const supplier = await prisma.supplier.create({
-      data: payload.data,
+      data: {
+        stallId,
+        ...payload.data,
+      },
     });
 
     return res.status(201).json(supplier);
@@ -760,12 +1188,26 @@ app.post("/api/suppliers", async (req, res) => {
 });
 
 app.put("/api/suppliers/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateSupplierPayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
   }
 
   try {
+    const existingSupplier = await prisma.supplier.findFirst({
+      where: { id: req.params.id, stallId },
+      select: { id: true },
+    });
+
+    if (!existingSupplier) {
+      return res.status(404).json({ error: "Supplier not found." });
+    }
+
     const updatedSupplier = await prisma.$transaction(async (tx) => {
       const supplier = await tx.supplier.update({
         where: { id: req.params.id },
@@ -782,33 +1224,46 @@ app.put("/api/suppliers/:id", async (req, res) => {
 
     return res.json(updatedSupplier);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Supplier not found." });
-    }
-
     return sendInternalError(res, "Failed to update supplier.", error);
   }
 });
 
 app.delete("/api/suppliers/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
+    const existingSupplier = await prisma.supplier.findFirst({
+      where: { id: req.params.id, stallId },
+      select: { id: true },
+    });
+
+    if (!existingSupplier) {
+      return res.status(404).json({ error: "Supplier not found." });
+    }
+
     const deletedSupplier = await prisma.supplier.delete({
       where: { id: req.params.id },
     });
 
     return res.json(deletedSupplier);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Supplier not found." });
-    }
-
     return sendInternalError(res, "Failed to delete supplier.", error);
   }
 });
 
 app.get("/api/supplier-prices", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const where: { supplierId?: string; inventoryItemId?: string } = {};
+    const where: Prisma.SupplierPriceWhereInput = {
+      supplier: { stallId },
+    };
 
     if (typeof req.query.supplierId === "string" && req.query.supplierId.trim()) {
       where.supplierId = req.query.supplierId.trim();
@@ -833,9 +1288,17 @@ app.get("/api/supplier-prices", async (req, res) => {
 });
 
 app.get("/api/supplier-prices/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const supplierPrice = await prisma.supplierPrice.findUnique({
-      where: { id: req.params.id },
+    const supplierPrice = await prisma.supplierPrice.findFirst({
+      where: {
+        id: req.params.id,
+        supplier: { stallId },
+      },
     });
 
     if (!supplierPrice) {
@@ -849,6 +1312,11 @@ app.get("/api/supplier-prices/:id", async (req, res) => {
 });
 
 app.post("/api/supplier-prices", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateSupplierPricePayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
@@ -856,17 +1324,21 @@ app.post("/api/supplier-prices", async (req, res) => {
 
   try {
     const [supplier, inventoryItem] = await Promise.all([
-      prisma.supplier.findUnique({ where: { id: payload.data.supplierId } }),
-      prisma.inventoryItem.findUnique({ where: { id: payload.data.inventoryItemId } }),
+      prisma.supplier.findFirst({
+        where: { id: payload.data.supplierId, stallId },
+      }),
+      prisma.inventoryItem.findFirst({
+        where: { id: payload.data.inventoryItemId, stallId },
+      }),
     ]);
 
     if (!supplier) {
-      return res.status(400).json({ error: "supplierId does not match an existing supplier." });
+      return res.status(400).json({ error: "supplierId does not match an existing supplier for this stall." });
     }
 
     if (!inventoryItem) {
       return res.status(400).json({
-        error: "inventoryItemId does not match an existing inventory item.",
+        error: "inventoryItemId does not match an existing inventory item for this stall.",
       });
     }
 
@@ -886,24 +1358,38 @@ app.post("/api/supplier-prices", async (req, res) => {
 });
 
 app.put("/api/supplier-prices/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateSupplierPricePayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
   }
 
   try {
+    const existingRecord = await prisma.supplierPrice.findFirst({
+      where: { id: req.params.id, supplier: { stallId } },
+      select: { id: true },
+    });
+
+    if (!existingRecord) {
+      return res.status(404).json({ error: "Supplier price record not found." });
+    }
+
     const [supplier, inventoryItem] = await Promise.all([
-      prisma.supplier.findUnique({ where: { id: payload.data.supplierId } }),
-      prisma.inventoryItem.findUnique({ where: { id: payload.data.inventoryItemId } }),
+      prisma.supplier.findFirst({ where: { id: payload.data.supplierId, stallId } }),
+      prisma.inventoryItem.findFirst({ where: { id: payload.data.inventoryItemId, stallId } }),
     ]);
 
     if (!supplier) {
-      return res.status(400).json({ error: "supplierId does not match an existing supplier." });
+      return res.status(400).json({ error: "supplierId does not match an existing supplier for this stall." });
     }
 
     if (!inventoryItem) {
       return res.status(400).json({
-        error: "inventoryItemId does not match an existing inventory item.",
+        error: "inventoryItemId does not match an existing inventory item for this stall.",
       });
     }
 
@@ -919,33 +1405,44 @@ app.put("/api/supplier-prices/:id", async (req, res) => {
 
     return res.json(updatedSupplierPrice);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Supplier price record not found." });
-    }
-
     return sendInternalError(res, "Failed to update supplier price record.", error);
   }
 });
 
 app.delete("/api/supplier-prices/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
+    const existingRecord = await prisma.supplierPrice.findFirst({
+      where: { id: req.params.id, supplier: { stallId } },
+      select: { id: true },
+    });
+
+    if (!existingRecord) {
+      return res.status(404).json({ error: "Supplier price record not found." });
+    }
+
     const deletedSupplierPrice = await prisma.supplierPrice.delete({
       where: { id: req.params.id },
     });
 
     return res.json(deletedSupplierPrice);
   } catch (error) {
-    if (isPrismaNotFound(error)) {
-      return res.status(404).json({ error: "Supplier price record not found." });
-    }
-
     return sendInternalError(res, "Failed to delete supplier price record.", error);
   }
 });
 
 app.get("/api/sales", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const where: { menuItemId?: string } = {};
+    const where: { stallId: string; menuItemId?: string } = { stallId };
 
     if (typeof req.query.menuItemId === "string" && req.query.menuItemId.trim()) {
       where.menuItemId = req.query.menuItemId.trim();
@@ -956,8 +1453,6 @@ app.get("/api/sales", async (req, res) => {
       orderBy: { timestamp: "desc" },
     });
 
-    // Normalise timestamps to explicit UTC ISO strings so browsers never
-    // misinterpret a missing-Z timestamp as local time (which would show 8 hrs off in SGT).
     const normalised = sales.map(s => ({
       ...s,
       timestamp: s.timestamp instanceof Date ? s.timestamp.toISOString() : String(s.timestamp),
@@ -970,9 +1465,14 @@ app.get("/api/sales", async (req, res) => {
 });
 
 app.get("/api/sales/:id", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    const sale = await prisma.saleRecord.findUnique({
-      where: { id: req.params.id },
+    const sale = await prisma.saleRecord.findFirst({
+      where: { id: req.params.id, stallId },
     });
 
     if (!sale) {
@@ -986,14 +1486,19 @@ app.get("/api/sales/:id", async (req, res) => {
 });
 
 app.post("/api/sales", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   const payload = validateSalePayload(req.body);
   if ("error" in payload) {
     return res.status(400).json({ error: payload.error });
   }
 
   try {
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { id: payload.data.menuItemId },
+    const menuItem = await prisma.menuItem.findFirst({
+      where: { id: payload.data.menuItemId, stallId },
       include: {
         ingredients: {
           include: {
@@ -1024,7 +1529,7 @@ app.post("/api/sales", async (req, res) => {
           error: `Unit mismatch for ${ingredient.inventoryItemName}: recipe uses ${ingredient.unit}, inventory uses ${ingredient.inventoryItem.unit}.`,
         });
       }
-      
+
       const totalDeduction = roundQuantity(
         quantityPerPortionInInventoryUnit * payload.data.quantity
       );
@@ -1044,11 +1549,12 @@ app.post("/api/sales", async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const sale = await tx.saleRecord.create({
         data: {
-          ...{
-          ...payload.data,
+          stallId,
+          menuItemId: payload.data.menuItemId,
+          menuItemName: payload.data.menuItemName,
           menuItemPrice: menuItem.price,
-          timestamp: new Date(), // explicitly set so the DB stores the correct UTC moment
-        },
+          quantity: payload.data.quantity,
+          timestamp: new Date(),
         },
       });
 
@@ -1077,8 +1583,6 @@ app.post("/api/sales", async (req, res) => {
       return sale;
     });
 
-    // Ensure timestamp is returned as an explicit UTC ISO string (with Z suffix)
-    // so browsers never misinterpret it as local time.
     const saleWithUtcTimestamp = {
       ...result,
       timestamp: result.timestamp instanceof Date
@@ -1096,6 +1600,11 @@ app.post("/api/sales", async (req, res) => {
 });
 
 app.get('/api/forecast/today', async (req, res) => {
+  const stallId = getRequiredStallId(req);
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
     // All date logic in SGT (UTC+8) so "today" and day-of-week
     // match what the hawker stall owner sees on their phone.
@@ -1116,6 +1625,7 @@ app.get('/api/forecast/today', async (req, res) => {
 
     const historicalSales = await prisma.saleRecord.findMany({
       where: {
+        stallId,
         timestamp: {
           gte: fourWeeksAgoUtc,
           lt: sgtMidnightUtc, // strictly before SGT midnight — today's sales never affect the forecast
@@ -1298,49 +1808,163 @@ app.post('/api/voice/transcribe', upload.single('audio'), async (req: any, res: 
   }
 });
 
-app.get("/api/settings", async (_req, res) => {
+app.get("/api/settings", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
   try {
-    // @ts-ignore - StallSettings might not be in generated types yet
-    let settings = await (prisma as any).stallSettings.findFirst();
-    
-    // Create default settings if none exist
-    if (!settings) {
-      settings = await (prisma as any).stallSettings.create({ data: {} });
+    const stall = await prisma.stall.findUnique({
+      where: { id: stallId },
+      include: {
+        owner: true,
+        settings: true,
+      },
+    });
+
+    if (!stall) {
+      return res.status(404).json({ error: "Stall not found." });
     }
-    
-    return res.json(settings);
+
+    const settings =
+      stall.settings ??
+      (await prisma.stallSettings.create({
+        data: { stallId: stall.id },
+      }));
+
+    return res.json({
+      stallId: stall.id,
+      stallName: stall.stallName,
+      ownerName: stall.owner.name,
+      location: stall.location,
+      stallCategories: stall.stallCategories,
+      ingredientCategories: stall.ingredientCategories,
+      lowStockAlerts: settings.lowStockAlerts,
+      currency: settings.currency,
+      language: settings.language,
+      updatedAt: settings.updatedAt,
+    });
   } catch (error) {
     return sendInternalError(res, "Failed to fetch settings.", error);
   }
 });
 
 app.put("/api/settings", async (req, res) => {
+  const stallId = getRequiredStallId(req);
+
+  if (!stallId) {
+    return res.status(400).json({ error: "Missing x-stall-id header." });
+  }
+
+  const payload = validateSettingsPayload(req.body);
+  if ("error" in payload) {
+    return res.status(400).json({ error: payload.error });
+  }
+
   try {
-    const { stallName, ownerName, location, lowStockAlerts, currency, language } = req.body;
-    
-    let settings = await (prisma as any).stallSettings.findFirst();
-    if (!settings) {
-      settings = await (prisma as any).stallSettings.create({ data: {} });
-    }
-    
-    const updatedSettings = await (prisma as any).stallSettings.update({
-      where: { id: settings.id },
-      data: {
-        stallName: typeof stallName === 'string' ? stallName : settings.stallName,
-        ownerName: typeof ownerName === 'string' ? ownerName : settings.ownerName,
-        location: typeof location === 'string' ? location : settings.location,
-        lowStockAlerts: typeof lowStockAlerts === 'boolean' ? lowStockAlerts : settings.lowStockAlerts,
-        currency: typeof currency === 'string' ? currency : settings.currency,
-        language: typeof language === 'string' ? language : settings.language,
-      }
+    const existingStall = await prisma.stall.findUnique({
+      where: { id: stallId },
+      include: {
+        owner: true,
+        settings: true,
+      },
     });
-    
-    return res.json(updatedSettings);
+
+    if (!existingStall) {
+      return res.status(404).json({ error: "Stall not found." });
+    }
+
+    const stallUpdateData: Record<string, unknown> = {};
+    const settingsUpdateData: Record<string, unknown> = {};
+
+    if (payload.data.stallName !== undefined) {
+      stallUpdateData.stallName = payload.data.stallName;
+    }
+
+    if (payload.data.location !== undefined) {
+      stallUpdateData.location = payload.data.location;
+    }
+
+    if (payload.data.stallCategories !== undefined) {
+      stallUpdateData.stallCategories = payload.data.stallCategories;
+    }
+
+    if (payload.data.ingredientCategories !== undefined) {
+      stallUpdateData.ingredientCategories = payload.data.ingredientCategories;
+    }
+
+    if (payload.data.lowStockAlerts !== undefined) {
+      settingsUpdateData.lowStockAlerts = payload.data.lowStockAlerts;
+    }
+
+    if (payload.data.currency !== undefined) {
+      settingsUpdateData.currency = payload.data.currency;
+    }
+
+    if (payload.data.language !== undefined) {
+      settingsUpdateData.language = payload.data.language;
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedOwner =
+        payload.data.ownerName !== undefined
+          ? await tx.user.update({
+              where: { id: existingStall.ownerId },
+              data: { name: payload.data.ownerName },
+            })
+          : existingStall.owner;
+
+      const updatedStall =
+        Object.keys(stallUpdateData).length > 0
+          ? await tx.stall.update({
+              where: { id: stallId },
+              data: stallUpdateData,
+            })
+          : existingStall;
+
+      const updatedSettings = await tx.stallSettings.upsert({
+        where: { stallId },
+        update: settingsUpdateData,
+        create: {
+          stallId,
+          lowStockAlerts:
+            payload.data.lowStockAlerts !== undefined
+              ? payload.data.lowStockAlerts
+              : true,
+          currency:
+            payload.data.currency !== undefined ? payload.data.currency : "SGD",
+          language:
+            payload.data.language !== undefined
+              ? payload.data.language
+              : "English",
+        },
+      });
+
+      return {
+        updatedOwner,
+        updatedStall,
+        updatedSettings,
+      };
+    });
+
+    return res.json({
+      stallId: result.updatedStall.id,
+      stallName: result.updatedStall.stallName,
+      ownerName: result.updatedOwner.name,
+      location: result.updatedStall.location,
+      stallCategories: result.updatedStall.stallCategories,
+      ingredientCategories: result.updatedStall.ingredientCategories,
+      lowStockAlerts: result.updatedSettings.lowStockAlerts,
+      currency: result.updatedSettings.currency,
+      language: result.updatedSettings.language,
+      updatedAt: result.updatedSettings.updatedAt,
+    });
   } catch (error) {
     return sendInternalError(res, "Failed to update settings.", error);
   }
 });
-
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
 });
