@@ -9,7 +9,7 @@ import { createInventoryItem, deleteInventoryItem, getInventory, updateInventory
 import { createSupplierPrice, getSupplierPrices, updateSupplierPrice } from '../services/supplierPrices';
 import { getMenuItems } from '../services/menu';
 import type { MenuItem } from '../types/menu';
-import { API_BASE_WITH_API } from '../utils/apiBase';
+import { apiRequest } from '../services/api';
 
 interface InventoryListProps {
   initialSubTab?: 'stock' | 'restock';
@@ -84,13 +84,13 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
       // Fetch inventory and today's forecast in parallel for performance
       const [inventory, forecastRes] = await Promise.all([
         getInventory(),
-        fetch(`${API_BASE_WITH_API}/forecast/today`).catch(() => null)
+        apiRequest<any>('/api/forecast/today').catch(() => null)
       ]);
 
       const forecastMinMap = new Map<string, number>();
 
-      if (forecastRes && forecastRes.ok) {
-        const forecastData = await forecastRes.json();
+      if (forecastRes) {
+        const forecastData = forecastRes;
         if (forecastData.ingredientsNeeded) {
           forecastData.ingredientsNeeded.forEach((ingredient: { id: string; quantity: number }) => {
             forecastMinMap.set(ingredient.id, ingredient.quantity);
