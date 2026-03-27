@@ -2,6 +2,11 @@ import * as dotenv from "dotenv";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { randomBytes, scrypt as scryptCallback } from "node:crypto";
+import { promisify } from "node:util";
+
+const scryptAsync = promisify(scryptCallback);
+
 
 dotenv.config();
 
@@ -30,10 +35,15 @@ async function main() {
   await prisma.user.deleteMany();
 
   console.log("Creating demo user...");
+
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = (await scryptAsync("password123", salt, 64)) as Buffer;
+  const validPasswordHash = `${salt}:${derivedKey.toString("hex")}`;
+
   const user = await prisma.user.create({
     data: {
       email: "demo@managemee.app",
-      passwordHash: "demo-password-hash-placeholder",
+      passwordHash: validPasswordHash,
       name: "Wang Le Ming",
     },
   });

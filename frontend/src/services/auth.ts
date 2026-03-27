@@ -54,23 +54,23 @@ function normalizeCategoryList(categories: string[], fallback: string[]): string
 }
 
 export function saveAuthSession(session: AuthSession) {
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
 export function getStoredAuthSession(): AuthSession | null {
-  const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+  const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return null;
 
   try {
     return JSON.parse(raw) as AuthSession;
   } catch {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
   }
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 export function getStoredStallId(): string | null {

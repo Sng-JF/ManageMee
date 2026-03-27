@@ -4,7 +4,7 @@ const AUTH_STORAGE_KEY = 'managemee-auth';
 function getStoredStallId() {
   if (typeof window === 'undefined') return null;
 
-  const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+  const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return null;
 
   try {
