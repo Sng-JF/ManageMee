@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, X, TrendingDown, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { CheckCircle, X, TrendingDown, Plus, Minus, ShoppingBag, AlertTriangle } from 'lucide-react';
 import { CreateSalePayload, MenuItem } from '../types/menu';
 import { InventoryItem } from '../types/inventory';
 import { motion, AnimatePresence } from 'motion/react';
@@ -54,7 +54,8 @@ export default function QuickSale({ menuItem, inventoryItems, onClose, onConfirm
     unit: string;
     previousStock: number;
     newStock: number;
-  }>>([]);
+  }>>([])
+  const [saleError, setSaleError] = useState<string | null>(null);;
 
   const adjustIngredient = (index: number, change: number) => {
     setIngredientAdjustments(prev => {
@@ -128,6 +129,7 @@ const handleConfirmSale = async () => {
       };
     });
 
+    setSaleError(null);
     await onConfirm({
       menuItemId: menuItem.id,
       menuItemName: menuItem.name,
@@ -138,6 +140,7 @@ const handleConfirmSale = async () => {
     setAnimationStage('deducting');
   } catch (error) {
     console.error('Failed to confirm sale:', error);
+    setSaleError(error instanceof Error ? error.message : 'Failed to record sale.');
   }
 };
 
@@ -368,6 +371,17 @@ const handleConfirmSale = async () => {
                         💡 Tip: Set to 0 to exclude an ingredient (e.g., "no vegetables")
                       </p>
                     </div>*/}
+                  </div>
+                )}
+
+                {/* Sale Error Banner */}
+                {saleError && (
+                  <div className="bg-red-50 border-2 border-red-600 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle size={20} className="text-red-600 flex-shrink-0" strokeWidth={2.5} />
+                      <p className="font-bold text-red-600 text-sm">Not Enough Stock</p>
+                    </div>
+                    <p className="text-gray-900 font-bold text-sm">{saleError}</p>
                   </div>
                 )}
 

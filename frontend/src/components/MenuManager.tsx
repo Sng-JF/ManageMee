@@ -243,7 +243,6 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
       setInventoryItems(refreshedInventory);
     } catch (error) {
       console.error('Failed to record sale:', error);
-      alert(error instanceof Error ? error.message : 'Failed to record sale.');
       throw error;
     }
   };
