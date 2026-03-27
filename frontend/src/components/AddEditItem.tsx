@@ -609,7 +609,7 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
               ))}
             </select>
           </div>
-        )}
+        </div>
 
         <div>
           <label className="block text-gray-900 font-bold mb-1 text-base">
@@ -673,10 +673,8 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
 
           {showNewSupplierInput ? (
             <div className="mt-3 rounded-2xl border-2 border-orange-600 p-4">
-              {/* <p className="mb-3 text-lg font-bold text-gray-900">Add New Supplier:</p> */}
-              
+              <p className="mb-3 text-lg font-bold text-gray-900">Add New Supplier:</p>
               <div className="space-y-3">
-                <label className="block text-gray-900 font-bold mb-1 text-base">Supplier Name *</label>
                 <input
                   type="text"
                   required
@@ -686,7 +684,6 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
                   autoFocus
                   className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
                 />
-                <label className="block text-gray-900 font-bold mb-1 text-base">Supplier Contact *</label>
                 <input
                   type="text"
                   required
@@ -726,27 +723,8 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
             <p className="text-xs text-gray-500 mt-2">Loading saved supplier price...</p>
           )}
         </div>
-          
-        {false && (
-        <div>
-          <label className="block text-gray-900 font-bold mb-1 text-base">
-            Target Price (per {formData.unit})
-          </label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-gray-600">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.targetPrice}
-              onChange={(e) => setFormData({ ...formData, targetPrice: e.target.value })}
-              placeholder="0.00"
-              className="w-full pr-4 py-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
-              style={{ paddingLeft: '30px' }}
-            />
-          </div>
-        </div>
-        )}
+
+        {/* Target price kept in state/payload but hidden from the UI for now */}
 
         <button
           type="submit"
