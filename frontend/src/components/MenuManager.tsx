@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Edit2, Zap, ChevronDown, ChevronRight, Search, Mic, X } from 'lucide-react';
+import { Plus, Edit2, Zap, ChevronDown, ChevronRight, Search, Mic, X, CheckCircle, Receipt } from 'lucide-react';
 import { getStoredStallCategories } from '../services/auth';
 import wontonmeeImg from '../assets/wontonmee.png';
 import roastedcrImg from '../assets/roastedcr.png';
@@ -114,11 +114,11 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
   const activeTab = initialSubTab;
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-
+  const [quickSaleFeedback, setQuickSaleFeedback] = useState<Record<string, { status: 'confirm' | 'loading' | 'success', quantity?: number }>>({});
   const [voicePrefillQuantity, setVoicePrefillQuantity] = useState(1);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-
+  
   const configuredDishCategories = useMemo(() => {
     const baseCategories = getStoredStallCategories();
 
@@ -175,6 +175,53 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
       };
     }
   }, [activeTab, onFormStateChange]);
+
+  // 1. User taps a number button
+  const initiateQuickSale = (item: MenuItem, quantity: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'confirm', quantity } }));
+  };
+
+  // 2. User cancels the confirmation
+  const cancelQuickSale = (itemId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuickSaleFeedback(prev => {
+      const newState = { ...prev };
+      delete newState[itemId];
+      return newState;
+    });
+  };
+  // 3. User confirms the sale
+  const confirmQuickSale = async (item: MenuItem, quantity: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'loading', quantity } }));
+    
+    try {
+      await handleSaleConfirm({
+        menuItemId: item.id,
+        menuItemName: item.name,
+        quantity,
+      });
+      
+      setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'success', quantity } }));
+      
+      setTimeout(() => {
+        setQuickSaleFeedback(prev => {
+          const newState = { ...prev };
+          delete newState[item.id];
+          return newState;
+        });
+      }, 1500);
+    } catch (error) {
+      setQuickSaleFeedback(prev => {
+        const newState = { ...prev };
+        delete newState[item.id];
+        return newState;
+      });
+      alert('Failed to record quick sale. ' + (error instanceof Error ? error.message : ''));
+    }
+  };
 
   const handleSaveMenuItem = async (item: MenuItem | MenuItemPayload) => {
     try {
@@ -265,6 +312,29 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
     }
   };
 
+  const handleInstantSale = async (item: MenuItem, quantity: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // 1. Instantly record the sale
+      await createSale({
+        menuItemId: item.id,
+        menuItemName: item.name,
+        quantity,
+      });
+      
+      // 2. Refresh dashboard stats
+      onSaleRecorded?.();
+      
+      // 3. Silently refresh inventory in the background
+      const refreshedInventory = await getInventory();
+      setInventoryItems(refreshedInventory);
+      
+    } catch (error) {
+      console.error('Failed to record instant sale:', error);
+      alert(error instanceof Error ? error.message : 'Failed to record sale.');
+    }
+  };
+
   const handleExitToHome = () => {
     onFormStateChange?.(false);
     onExitToHome?.();
@@ -344,6 +414,41 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
       ),
     [menuItems, searchQuery],
   );
+
+  const executeQuickSale = async (item: MenuItem, quantity: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Set loading state
+    setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'loading', quantity } }));
+    
+    try {
+      await handleSaleConfirm({
+        menuItemId: item.id,
+        menuItemName: item.name,
+        quantity,
+      });
+      
+      // Set success state
+      setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'success', quantity } }));
+      
+      // Clear the feedback after 1.5 seconds to bring the buttons back
+      setTimeout(() => {
+        setQuickSaleFeedback(prev => {
+          const newState = { ...prev };
+          delete newState[item.id];
+          return newState;
+        });
+      }, 1500);
+    } catch (error) {
+      // Clear loading state on error
+      setQuickSaleFeedback(prev => {
+        const newState = { ...prev };
+        delete newState[item.id];
+        return newState;
+      });
+      alert('Failed to record quick sale. ' + (error instanceof Error ? error.message : ''));
+    }
+  };
 
   if (showEdit) {
     return (
@@ -466,10 +571,13 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                           >
                             {/* Header - Always Visible */}
                             <div
-                              onClick={() => toggleExpanded(item.id)}
-                              className="p-4 cursor-pointer active:bg-gray-50"
+                              onClick={() => {
+                                // Only expand in 'all' mode. In 'work' mode, we keep it compact.
+                                if (activeTab === 'all') toggleExpanded(item.id);
+                              }}
+                              className={`p-4 ${activeTab === 'all' ? 'cursor-pointer active:bg-gray-50' : ''}`}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 mb-2">
                                 {/* Dish Image */}
                                 <div className="flex-shrink-0">
                                   {(item.image || LOCAL_IMAGES[item.name]) ? (
@@ -484,38 +592,110 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                                 </div>
 
                                 {/* Dish Info */}
-                                <div className="flex-1">
-                                  <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-gray-900 text-lg leading-tight mb-0.5 truncate">
                                     {item.name}
                                   </h3>
-                                  <p className="text-orange-600 font-bold text-xl">
+                                  <p className="text-orange-600 font-bold text-lg">
                                     ${item.price.toFixed(2)}
                                   </p>
                                 </div>
 
-                                {/* Quick Sale Button - only shown in Work Mode */}
-                                {activeTab === 'work' && (
-                                  <button
-                                    onClick={(e) => handleQuickSale(item, e)}
-                                    className="bg-green-600 text-white rounded-lg px-4 py-3 font-bold flex items-center gap-2 active:bg-green-700 transition-colors"
-                                  >
-                                    <Zap size={20} strokeWidth={2.5} />
-                                    <span className="text-sm">SELL</span>
-                                  </button>
+                                {/* Expand Icon (Only in All Dishes tab) */}
+                                {activeTab === 'all' && (
+                                  <div className="text-gray-600 shrink-0">
+                                    {isExpanded ? (
+                                      <ChevronDown size={24} strokeWidth={2.5} />
+                                    ) : (
+                                      <ChevronRight size={24} strokeWidth={2.5} />
+                                    )}
+                                  </div>
                                 )}
-
-                                {/* Expand Icon */}
-                                <div className="text-gray-600">
-                                  {isExpanded ? (
-                                    <ChevronDown size={24} strokeWidth={2.5} />
-                                  ) : (
-                                    <ChevronRight size={24} strokeWidth={2.5} />
-                                  )}
-                                </div>
                               </div>
 
-                              {/* Ingredient Count Preview */}
-                              {!isExpanded && (
+                              {/* Work Mode Controls - Quick Sale Buttons */}
+                              {activeTab === 'work' && (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                  {quickSaleFeedback[item.id]?.status === 'confirm' ? (
+                                    /* Confirmation Overlay */
+                                    <div className="flex flex-col gap-3 p-3 bg-orange-50 rounded-xl border-2 border-orange-200">
+                                      <p className="text-center font-bold text-orange-900 text-base">
+                                        Log {quickSaleFeedback[item.id].quantity}x {item.name}?
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          onClick={(e) => cancelQuickSale(item.id, e)}
+                                          className="flex-1 py-3 bg-white text-gray-600 font-bold rounded-lg border-2 border-gray-200 active:bg-gray-100 transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button 
+                                          onClick={(e) => confirmQuickSale(item, quickSaleFeedback[item.id].quantity!, e)}
+                                          className="flex-1 py-3 bg-orange-600 text-white font-bold rounded-lg active:bg-orange-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+                                        >
+                                          <CheckCircle size={20} strokeWidth={2.5} /> Confirm
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : quickSaleFeedback[item.id]?.status === 'loading' || quickSaleFeedback[item.id]?.status === 'success' ? (
+                                    /* Loading/Success Overlay */
+                                    <div className={`w-full h-[60px] flex items-center justify-center rounded-xl font-bold text-base transition-colors border-2 ${
+                                      quickSaleFeedback[item.id].status === 'success' 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                                    }`}>
+                                      {quickSaleFeedback[item.id].status === 'success' ? (
+                                        <span className="flex items-center gap-2">
+                                          <CheckCircle size={22} strokeWidth={2.5} /> 
+                                          Logged {quickSaleFeedback[item.id].quantity} portion{quickSaleFeedback[item.id].quantity! > 1 ? 's' : ''}
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-2 animate-pulse">
+                                          Recording...
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    /* Default Bigger Buttons */
+                                    <div className="flex flex-col gap-2">
+                                      {/* Transactional Quick Row */}
+                                      <div className="flex items-center bg-orange-50/50 border border-orange-200 rounded-xl p-1 h-[56px] shadow-sm">
+                                        
+                                        {/* Commerce Anchor */}
+                                        <div className="flex flex-col items-center justify-center px-3 text-green-600">
+                                          <Receipt size={18} strokeWidth={2.5} />
+                                          <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">Sell</span>
+                                        </div>
+
+                                        {/* Multiplier Buttons */}
+                                        <div className="flex flex-1 gap-1 h-full pr-1">
+                                          {[1, 2, 3, 4].map(num => (
+                                            <button
+                                              key={num}
+                                              onClick={(e) => initiateQuickSale(item, num, e)}
+                                              className="flex-1 bg-white text-gray-800 hover:text-orange-600 active:bg-orange-600 active:text-white rounded-lg font-black text-xl shadow-sm transition-all border border-orange-100 flex items-center justify-center"
+                                            >
+                                              {num}x
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      {/* Clear Custom Order Button */}
+                                      <button
+                                        onClick={(e) => handleQuickSale(item, e)}
+                                        className="w-full h-[44px] bg-white text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl font-bold flex items-center justify-center gap-2 active:bg-gray-50 transition-colors shadow-sm"
+                                      >
+                                        <Zap size={18} className="text-yellow-500" strokeWidth={2.5} />
+                                        <span className="text-sm">Custom Order...</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Ingredient Count Preview (Only in All Dishes tab) */}
+                              {activeTab === 'all' && !isExpanded && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <p className="text-gray-600 font-bold text-xs">
                                     {item.ingredients.length} {item.ingredients.length === 1 ? 'ingredient' : 'ingredients'}
@@ -528,8 +708,8 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                               )}
                             </div>
 
-                            {/* Expanded Details */}
-                            {isExpanded && (
+                            {/* Expanded Details (Only in All Dishes tab) */}
+                            {activeTab === 'all' && isExpanded && (
                               <div className="border-t-2 border-gray-200 p-4 space-y-4">
                                 {/* Ingredients List */}
                                 <div>
@@ -554,16 +734,13 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                                 {/* Dish Availability Widget */}
                                 {/*<DishAvailability menuItem={item} />*/}
 
-                                {/* Edit Button - only shown in All Dishes tab */}
-                                {activeTab === 'all' && (
-                                  <button
-                                    onClick={() => handleEdit(item)}
-                                    className="w-full bg-orange-600 text-white rounded-lg p-3 font-bold flex items-center justify-center gap-2 active:bg-orange-700 transition-colors"
-                                  >
-                                    <Edit2 size={20} strokeWidth={2.5} />
-                                    Edit Dish
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="w-full bg-orange-600 text-white rounded-lg p-3 font-bold flex items-center justify-center gap-2 active:bg-orange-700 transition-colors"
+                                >
+                                  <Edit2 size={20} strokeWidth={2.5} />
+                                  Edit Dish
+                                </button>
                               </div>
                             )}
                           </div>

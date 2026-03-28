@@ -5,7 +5,7 @@ import cors from "cors";
 import multer from "multer";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient } from "./generated/prisma/client.js";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 

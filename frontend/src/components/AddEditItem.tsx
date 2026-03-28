@@ -19,6 +19,7 @@ interface AddEditItemProps {
 }
 
 export default function AddEditItem({ item, onSave, onCancel, onDelete, isDeleteDisabled = false }: AddEditItemProps) {
+  const isEditing = Boolean(item);
   const [categoryOptions, setCategoryOptions] = useState<string[]>(() =>
     Array.from(
       new Set([
@@ -73,14 +74,14 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
         ...prev,
         ...(parsed.name && { name: parsed.name }),
         ...(parsed.category && { category: parsed.category }),
-        ...(parsed.quantity && { quantity: parsed.quantity }),
-        ...(parsed.unit && { unit: parsed.unit }),
+        ...(!isEditing && parsed.quantity && { quantity: parsed.quantity }),
+        ...(!isEditing && parsed.unit && { unit: parsed.unit }),
         ...(parsed.minQuantity && { minQuantity: parsed.minQuantity }),
         ...(parsed.supplier && { supplier: parsed.supplier }),
         ...(parsed.targetPrice && { targetPrice: parsed.targetPrice }),
       }));
     }
-  }, [resultCount, supplierOptions, categoryOptions, transcript, voiceState]);
+  }, [categoryOptions, isEditing, resultCount, supplierOptions, transcript, voiceState]);
 
   const availableUnits = getUnitsForCategory(formData.category);
 
@@ -363,8 +364,8 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
       ...item,
       name: formData.name,
       category: categoryName,
-      quantity: parseFloat(formData.quantity),
-      unit: formData.unit,
+      quantity: isEditing ? item.quantity : parseFloat(formData.quantity),
+      unit: isEditing ? item.unit : formData.unit,
       minQuantity: parseFloat(formData.minQuantity),
       supplier: supplierName,
       targetPrice: parseFloat(formData.targetPrice) || 0,
@@ -578,38 +579,40 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-gray-900 font-bold mb-1 text-base">
-              Quantity *
-            </label>
-            <input
-              type="number"
-              required
-              step="0.1"
-              min="0"
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-              placeholder="0.0"
-              className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
-            />
+        {!isEditing && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-gray-900 font-bold mb-1 text-base">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                required
+                step="0.1"
+                min="0"
+                value={formData.quantity}
+                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                placeholder="0.0"
+                className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-900 font-bold mb-1 text-base">
+                Unit *
+              </label>
+              <select
+                required
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
+              >
+                {availableUnits.map((unit) => (
+                  <option key={unit} value={unit}>{unit}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-gray-900 font-bold mb-1 text-base">
-              Unit *
-            </label>
-            <select
-              required
-              value={formData.unit}
-              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-              className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
-            >
-              {availableUnits.map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
 
         <div>
           <label className="block text-gray-900 font-bold mb-1 text-base">

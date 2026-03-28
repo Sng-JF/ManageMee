@@ -235,20 +235,25 @@ export default function Dashboard({ onNavigateToWorkMode, onNavigateToRestock, s
               </div>
             </div>
 
-            {/* Hourly Sales Chart */}
             <div className="bg-white border-2 border-gray-200 shadow-sm rounded-lg p-4">
-              <h3 className="font-bold text-gray-900 mb-1">Sales by Hour</h3>
-              <p className="text-gray-500 text-sm font-medium mb-4">Portions sold today (SGT)</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={hourlyData} margin={{ left: -20, right: 0, top: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="hour" stroke="#9ca3af" style={{ fontSize: '9px', fontWeight: 'bold' }} interval={1} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#9ca3af" style={{ fontSize: '10px', fontWeight: 'bold' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ fontWeight: 'bold', border: 'none', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value) => [value, 'Portions']} />
-                  <Bar dataKey="sales" fill="#f97316" radius={[4, 4, 0, 0]} barSize={14} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <h3 className="font-bold text-gray-900 mb-1">Sales by Hour</h3>
+            {/* Changed description from "Portions" to "Revenue" */}
+            <p className="text-gray-500 text-sm font-medium mb-4">Revenue today (SGT)</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={hourlyData} margin={{ left: -20, right: 0, top: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="hour" stroke="#9ca3af" style={{ fontSize: '9px', fontWeight: 'bold' }} interval={1} tickLine={false} axisLine={false} />
+                <YAxis stroke="#9ca3af" style={{ fontSize: '10px', fontWeight: 'bold' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                {/* Updated the Tooltip formatter to show $ and 'Revenue' instead of 'Portions' */}
+                <Tooltip 
+                  cursor={{ fill: '#f3f4f6' }} 
+                  contentStyle={{ fontWeight: 'bold', border: 'none', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                  formatter={(value) => [`$${value}`, 'Revenue']} 
+                />
+                <Bar dataKey="sales" fill="#f97316" radius={[4, 4, 0, 0]} barSize={14} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
             {/* Historical Trend */}
             <div className="bg-white border-2 border-gray-200 shadow-sm rounded-lg p-4">
