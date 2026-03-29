@@ -579,7 +579,7 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
           )}
         </div>
 
-        {!isEditing && (
+        {(
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-gray-900 font-bold mb-1 text-base">

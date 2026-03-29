@@ -23,6 +23,7 @@ interface QuickSaleProps {
   inventoryItems: InventoryItem[];
   onClose: () => void;
   onConfirm: (payload: CreateSalePayload) => void | Promise<void>;
+  onSaleLogged?: (menuItemName: string, quantity: number) => void;
   initialQuantity?: number;
 }
 
@@ -34,10 +35,11 @@ interface IngredientAdjustment {
   unit: string;
 }
 
-export default function QuickSale({ menuItem, inventoryItems, onClose, onConfirm, initialQuantity = 1 }: QuickSaleProps) {
+export default function QuickSale({ menuItem, inventoryItems, onClose, onConfirm, onSaleLogged, initialQuantity = 1 }: QuickSaleProps) {
   const [animationStage, setAnimationStage] = useState<'input' | 'deducting' | 'complete'>('input');
   const [quantity, setQuantity] = useState(initialQuantity);
   const [showIngredientAdjustments, setShowIngredientAdjustments] = useState(false);
+  const [completedSale, setCompletedSale] = useState<{ name: string; quantity: number } | null>(null);
   const [ingredientAdjustments, setIngredientAdjustments] = useState<IngredientAdjustment[]>(
     menuItem.ingredients.map((ing) => ({
       inventoryItemId: ing.inventoryItemId,
@@ -137,7 +139,8 @@ export default function QuickSale({ menuItem, inventoryItems, onClose, onConfirm
         menuItemName: menuItem.name,
         quantity,
       });
-
+      
+      setCompletedSale({ name: menuItem.name, quantity });
       setInventoryUpdates(updates);
       setAnimationStage('deducting');
     } catch (error) {
@@ -160,11 +163,15 @@ export default function QuickSale({ menuItem, inventoryItems, onClose, onConfirm
     if (animationStage === 'complete') {
       const closeTimer = setTimeout(() => {
         onClose();
+
+        if (completedSale) {
+          onSaleLogged?.(completedSale.name, completedSale.quantity);
+        }
       }, 2000);
 
       return () => clearTimeout(closeTimer);
     }
-  }, [animationStage, onClose]);
+  }, [animationStage, completedSale, onClose, onSaleLogged]);
 
   useEffect(() => {
     setQuantity(initialQuantity);

@@ -66,14 +66,14 @@ export default function DailyPrepForecast({ onViewDetails, recommendations }: Da
           return (
             <div
               key={i}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-xl border ${c.row}`}
+              className={`flex items-center justify-between px-4 py-1 rounded-xl border ${c.row}`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} />
-                <p className="text-gray-900 font-semibold text-sm truncate">{dish.name}</p>
+                <p className="text-gray-900 font-bold text-sm truncate">{dish.name}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-2">
-                {dish.change > 0 ? (
+                {/* {dish.change > 0 ? (
                   <span className="flex items-center gap-0.5 text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] font-bold">
                     <TrendingUp size={9} /> +{dish.change}%
                   </span>
@@ -85,8 +85,8 @@ export default function DailyPrepForecast({ onViewDetails, recommendations }: Da
                   <span className="flex items-center gap-0.5 text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-bold">
                     <Minus size={9} /> 0%
                   </span>
-                )}
-                <p className={`font-black text-base w-6 text-right ${c.text}`}>{dish.prep}</p>
+                )} */}
+                <p className={`font-black font-bold text-base w-6 text-right ${c.text}`}>{dish.prep}</p>
               </div>
             </div>
           );
@@ -94,7 +94,7 @@ export default function DailyPrepForecast({ onViewDetails, recommendations }: Da
       </div>
 
       {/* Footer */}
-      <div className="w-full bg-gray-50 border-2 border-gray-100 text-gray-600 rounded-xl py-2.5 px-4 font-bold text-sm flex items-center justify-between group-hover:bg-orange-50 group-hover:border-orange-200 group-hover:text-orange-600 transition-colors">
+      <div className="w-full bg-gray-50 border-2 border-gray-100 text-gray-600 rounded-xl py-2 px-4 font-bold text-sm flex items-center justify-between group-hover:bg-orange-50 group-hover:border-orange-200 group-hover:text-orange-600 transition-colors">
         <span>View Full Prep Guide</span>
         <ChevronRight size={16} strokeWidth={3} />
       </div>

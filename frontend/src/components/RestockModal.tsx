@@ -8,11 +8,19 @@ interface RestockModalProps {
   item: InventoryItem;
   onRestock: (itemId: string, quantity: number, supplier: string, estimatedCost: number) => void;
   onClose: () => void;
+  restockMode: 'required' | 'optional';
 }
 
-export default function RestockModal({ item, onRestock, onClose }: RestockModalProps) {
-  // Calculate recommended restock amount: enough to reach 2x minimum quantity
-  const recommendedAmount = Math.max(0, (item.minQuantity * 2) - item.quantity);
+export default function RestockModal({ item, onRestock, onClose, restockMode = 'required' }: RestockModalProps) {
+  const isOptionalRestock = restockMode === 'optional';
+  const isLowStock = item.quantity < item.minQuantity;
+
+  // Optional good-stock restock: recommend the minimum quantity needed.
+  // Required low-stock restock: recommend enough to reach 2x minimum quantity.
+  const recommendedAmount = isOptionalRestock
+    ? item.minQuantity
+    : Math.max(0, (item.minQuantity * 2) - item.quantity);
+
   const [restockQuantity, setRestockQuantity] = useState<number | string>('');
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -98,8 +106,10 @@ export default function RestockModal({ item, onRestock, onClose }: RestockModalP
     const pricePerUnit = selectedSupplierPrice?.price || sortedSuppliers[0]?.price || item.targetPrice;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="absolute inset-0 bg-black/50 z-50 overflow-hidden">
+        <div className="h-full px-4 pt-16 pb-4">
+          <div className="mx-auto h-full max-w-md">
+            <div className="bg-white rounded-lg h-full overflow-y-auto hide-scrollbar">
           {/* Header */}
           <div className="sticky top-0 bg-green-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -201,12 +211,16 @@ export default function RestockModal({ item, onRestock, onClose }: RestockModalP
           </div>
         </div>
       </div>
+      </div>
+      </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+  <div className="absolute inset-0 bg-black/50 z-50 overflow-hidden">
+    <div className="h-full px-4 pt-16 pb-4">
+      <div className="mx-auto h-full max-w-md">
+        <div className="bg-white rounded-lg h-full overflow-y-auto hide-scrollbar">
         {/* Header */}
         <div className="sticky top-0 bg-orange-600 text-white p-4 flex items-center justify-between">
           <h2 className="font-bold text-xl">Restock Ingredient</h2>
@@ -221,21 +235,39 @@ export default function RestockModal({ item, onRestock, onClose }: RestockModalP
         {/* Content */}
         <div className="p-4 space-y-4">
           {/* Item Info */}
-          <div className="bg-red-50 border-2 border-red-600 rounded-lg p-4">
+          <div
+            className={`border-2 rounded-lg p-4 ${
+              isLowStock
+                ? 'bg-red-50 border-red-600'
+                : 'bg-green-50 border-green-600'
+            }`}
+          >
             <div className="flex items-start justify-between mb-2">
               <div>
                 <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
                 <p className="text-gray-600 font-bold text-sm">{item.category}</p>
               </div>
-              <div className="bg-red-600 text-white px-3 py-1 rounded font-bold text-xs flex items-center gap-1">
+              <div
+                className={`px-3 py-1 rounded font-bold text-xs flex items-center gap-1 ${
+                  isLowStock
+                    ? 'bg-red-600 text-white'
+                    : 'bg-green-600 text-white'
+                }`}
+              >
                 <AlertTriangle size={14} strokeWidth={2.5} />
-                LOW
+                {isOptionalRestock ? 'OPTIONAL' : isLowStock ? 'LOW' : 'GOOD'}
               </div>
             </div>
             <div className="flex items-center gap-4">
               <div>
                 <p className="text-gray-600 font-bold text-xs">Current Stock</p>
-                <p className="text-red-600 font-bold text-2xl">{item.quantity} {item.unit}</p>
+                <p
+                  className={`font-bold text-2xl ${
+                    isLowStock ? 'text-red-600' : 'text-green-600'
+                  }`}
+                >
+                  {item.quantity} {item.unit}
+                </p>
               </div>
               <div>
                 <p className="text-gray-600 font-bold text-xs">Minimum</p>
@@ -251,7 +283,9 @@ export default function RestockModal({ item, onRestock, onClose }: RestockModalP
               {recommendedAmount.toFixed(1)} {item.unit}
             </p>
             <p className="text-gray-600 font-bold text-xs">
-              (Brings stock to {(item.minQuantity * 2).toFixed(1)} {item.unit})
+              {isOptionalRestock
+                ? `(Minimum quantity needed)`
+                : `(Brings stock to ${(item.minQuantity * 2).toFixed(1)} ${item.unit})`}
             </p>
           </div>
 
@@ -445,5 +479,7 @@ export default function RestockModal({ item, onRestock, onClose }: RestockModalP
         </div>
       </div>
     </div>
+  </div>
+  </div>
   );
 }

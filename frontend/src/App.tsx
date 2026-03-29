@@ -54,6 +54,7 @@ export default function App() {
             onNavigateToWorkMode={navigateToWorkMode}
             onNavigateToRestock={navigateToRestock}
             salesRefreshKey={salesRefreshKey}
+            onFormStateChange={setIsFormOpen}
           />
         );
       case 'inventory':
