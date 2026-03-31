@@ -26,93 +26,91 @@ export default function LowStockAlert({ lowStockItems, onGoToRestock, onClose }:
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="relative h-full overflow-hidden flex flex-col ">
         {/* Header */}
-        <div className="sticky top-0 bg-red-600 text-white p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={28} strokeWidth={2.5} />
-            <h2 className="font-bold text-xl">Low Stock Alert!</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-white active:bg-red-700 p-1 rounded transition-colors"
-          >
-            <X size={28} strokeWidth={2.5} />
-          </button>
-        </div>
+        <div className="shrink-0 p-4 pb-0">
+            <div className="bg-red-600 rounded-lg p-4 flex items-center justify-between">
+              <h1 className="text-2xl font-bold text-white">Low Stock Alert</h1>
+              <button
+                onClick={onClose}
+                className="text-white active:bg-gray-100 p-2 rounded-lg transition-colors"
+              >
+                <X size={28} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div> 
 
-        {/* Content */}
-        <div className="p-4">
-          <div className="mb-4">
-            <p className="text-gray-900 font-bold text-lg">
-              {lowStockItems.length} ingredient{lowStockItems.length !== 1 ? 's' : ''} below minimum stock level
-            </p>
-            <p className="text-gray-600 font-bold text-sm">
-              Review items that need restocking
-            </p>
-          </div>
+          {/* Content */}
+          <div className="p-4">
+            <div className="mb-4">
+              <p className="text-gray-900 font-bold text-lg">
+                {lowStockItems.length} ingredient{lowStockItems.length !== 1 ? 's' : ''} below minimum stock level
+              </p>
+              <p className="text-gray-600 font-bold text-sm">
+                Review items that need restocking
+              </p>
+            </div>
 
-          {/* Low Stock Items List */}
-          <div className="space-y-3">
-            {lowStockItems.map(item => {
-              return (
-                <div
-                  key={item.id}
-                  className="w-full bg-red-50 border-2 border-red-600 rounded-lg p-4"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
-                      <p className="text-gray-600 font-bold text-sm">{item.category}</p>
+            {/* Low Stock Items List */}
+            <div className="space-y-3">
+              {lowStockItems.map(item => {
+                return (
+                  <div
+                    key={item.id}
+                    className="w-full bg-red-50 border-2 border-red-600 rounded-lg p-4"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
+                        <p className="text-gray-600 font-bold text-sm">{item.category}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleExpanded(item.id)}
+                        className="text-gray-600 hover:text-gray-900 active:text-gray-900 transition-colors"
+                      >
+                        {expandedItems.has(item.id) ? <ChevronUp size={24} strokeWidth={2.5} /> : <ChevronDown size={24} strokeWidth={2.5} />}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => toggleExpanded(item.id)}
-                      className="text-gray-600 hover:text-gray-900 active:text-gray-900 transition-colors"
-                    >
-                      {expandedItems.has(item.id) ? <ChevronUp size={24} strokeWidth={2.5} /> : <ChevronDown size={24} strokeWidth={2.5} />}
-                    </button>
+
+                    {expandedItems.has(item.id) && (
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-gray-600 font-bold text-xs">Current Stock</p>
+                          <p className="text-red-600 font-bold text-2xl">
+                            {item.quantity} {item.unit}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-gray-600 font-bold text-xs">Min Stock</p>
+                          <p className="text-orange-600 font-bold text-2xl">
+                            {item.minQuantity} {item.unit}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                );
+              })}
+            </div>
 
-                  {expandedItems.has(item.id) && (
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-gray-600 font-bold text-xs">Current Stock</p>
-                        <p className="text-red-600 font-bold text-2xl">
-                          {item.quantity} {item.unit}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-gray-600 font-bold text-xs">Min Stock</p>
-                        <p className="text-orange-600 font-bold text-2xl">
-                          {item.minQuantity} {item.unit}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={onGoToRestock}
-              className="w-full bg-orange-600 text-white rounded-lg p-4 font-bold text-lg flex items-center justify-center gap-2 active:bg-orange-700 transition-colors"
-            >
-              <Package size={24} strokeWidth={2.5} />
-              Go to Restock
-            </button>
-            <button
-              onClick={onClose}
-              className="w-full bg-gray-600 text-white rounded-lg p-4 font-bold text-lg active:bg-gray-700 transition-colors"
-            >
-              I'll Restock Later
-            </button>
+            {/* Action Buttons */}
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={onGoToRestock}
+                className="w-full bg-orange-600 text-white rounded-lg p-4 font-bold text-lg flex items-center justify-center gap-2 active:bg-orange-700 transition-colors"
+              >
+                <Package size={24} strokeWidth={2.5} />
+                Go to Restock
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full bg-gray-600 text-white rounded-lg p-4 font-bold text-lg active:bg-gray-700 transition-colors"
+              >
+                I'll Restock Later
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      // </div>
   );
 }

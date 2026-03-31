@@ -54,6 +54,7 @@ export default function App() {
             onNavigateToWorkMode={navigateToWorkMode}
             onNavigateToRestock={navigateToRestock}
             salesRefreshKey={salesRefreshKey}
+            onFormStateChange={setIsFormOpen}
           />
         );
       case 'inventory':
@@ -86,7 +87,7 @@ export default function App() {
   return (
     <IPhoneFrame>
       <div className="h-full bg-white flex flex-col">
-        <main className="flex-1 overflow-y-auto min-h-0">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto min-h-0 hide-scrollbar">{renderContent()}</main>
 
         {!isFormOpen && (
           <nav className="bg-white border-t-2 border-gray-200 flex-shrink-0">

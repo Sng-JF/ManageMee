@@ -8,6 +8,17 @@ import microphoneImg from '../assets/microphone.png';
 import { getStoredStallCategories, setStoredStallCategoryList } from '../services/auth';
 import { apiRequest } from '../services/api';
 
+import wontonmeeImg from '../assets/wontonmee.png';
+import roastedcrImg from '../assets/roastedcr.png';
+import currylaksaImg from '../assets/currylaksa.png';
+import cktImg from '../assets/ckt.png';
+const LOCAL_IMAGES: Record<string, string> = {
+  'Wonton Mee': wontonmeeImg,
+  'Roasted Chicken Rice': roastedcrImg,
+  'Curry Laksa': currylaksaImg,
+  'Char Kway Teow': cktImg,
+};
+
 interface EditMenuItemProps {
   item?: MenuItem | null;
   inventoryItems: InventoryItem[];
@@ -81,6 +92,26 @@ export default function EditMenuItem({ item, inventoryItems, onSave, onCancel, o
     }
   };
 }, [dishImagePreview]);
+
+useEffect(() => {
+  setDishName(item?.name || '');
+  setDishType(item?.category || categoryOptions[0] || 'Other');
+  setPrice(item?.price ? item.price.toFixed(2) : '');
+  setDishImage(item?.image ?? undefined);
+  setDishImagePreview(item?.image ?? undefined);
+
+  setIngredients(
+    (item?.ingredients || []).map((ingredient) => {
+      const normalized = normalizeToSmallestUnit(ingredient.quantity, ingredient.unit);
+
+      return {
+        ...ingredient,
+        quantity: normalized.quantity,
+        unit: normalized.unit,
+      };
+    })
+  );
+}, [item]);
 
   const persistNewDishCategory = async () => {
     const trimmedName = newCategoryName.trim();
@@ -299,7 +330,10 @@ export default function EditMenuItem({ item, inventoryItems, onSave, onCancel, o
     });
 
   // Check if all ingredients have 0 quantity (for create mode)
-  const displayedImage = dishImagePreview || dishImage;
+  const displayedImage =
+    dishImagePreview ||
+    dishImage ||
+    (item?.name ? LOCAL_IMAGES[item.name] : undefined);
   const allIngredientsZero = ingredients.length > 0 && ingredients.every(ing => ing.quantity === 0);
   
   {/* Delete Confirmation */}

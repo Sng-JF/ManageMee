@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Edit2, Zap, ChevronDown, ChevronRight, Search, Mic, X, CheckCircle, Receipt } from 'lucide-react';
+import { Plus, Edit2, Zap, ChevronDown, ChevronRight, Search, Mic, X, CheckCircle, Receipt, ChefHat, AlertTriangle } from 'lucide-react';
 import { getStoredStallCategories } from '../services/auth';
 import wontonmeeImg from '../assets/wontonmee.png';
 import roastedcrImg from '../assets/roastedcr.png';
@@ -117,6 +117,10 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
   const [quickSaleFeedback, setQuickSaleFeedback] = useState<Record<string, { status: 'confirm' | 'loading' | 'success', quantity?: number }>>({});
   const [voicePrefillQuantity, setVoicePrefillQuantity] = useState(1);
   const [isListening, setIsListening] = useState(false);
+  const [saleToast, setSaleToast] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   
   const configuredDishCategories = useMemo(() => {
@@ -176,6 +180,23 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
     }
   }, [activeTab, onFormStateChange]);
 
+  useEffect(() => {
+  const mainEl = document.querySelector('main');
+  if (!mainEl) return;
+
+  const previousOverflow = mainEl.style.overflow;
+
+  if (quickSaleItem) {
+    mainEl.style.overflow = 'hidden';
+  } else {
+    mainEl.style.overflow = previousOverflow || '';
+  }
+
+  return () => {
+    mainEl.style.overflow = previousOverflow;
+  };
+}, [quickSaleItem]);
+
   // 1. User taps a number button
   const initiateQuickSale = (item: MenuItem, quantity: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -204,22 +225,29 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
         quantity,
       });
       
-      setQuickSaleFeedback(prev => ({ ...prev, [item.id]: { status: 'success', quantity } }));
-      
-      setTimeout(() => {
-        setQuickSaleFeedback(prev => {
-          const newState = { ...prev };
-          delete newState[item.id];
-          return newState;
-        });
-      }, 1500);
+      setQuickSaleFeedback(prev => {
+        const newState = { ...prev };
+        delete newState[item.id];
+        return newState;
+      });
+
+      showSaleToast(
+        `Logged ${quantity} portion${quantity > 1 ? 's' : ''} of ${item.name}`,
+        'success'
+      );
     } catch (error) {
       setQuickSaleFeedback(prev => {
         const newState = { ...prev };
         delete newState[item.id];
         return newState;
       });
-      alert('Failed to record quick sale. ' + (error instanceof Error ? error.message : ''));
+
+      showSaleToast(
+        error instanceof Error
+          ? `Failed: Not enough stock for ${item.name}`
+          : `Failed to record sale for ${item.name}.`,
+        'error'
+      );
     }
   };
 
@@ -471,30 +499,90 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
+  const showSaleToast = (message: string, type: 'success' | 'error') => {
+    setSaleToast({ message, type });
+
+    setTimeout(() => {
+      setSaleToast(null);
+    }, 2400);
+  };
+
+  const getAvailablePortions = (item: MenuItem) => {
+    if (!item.ingredients.length) return 0;
+
+    const portionsPerIngredient = item.ingredients.map((ingredient) => {
+      const inventoryItem = inventoryItems.find(
+        (inv) => inv.id === ingredient.inventoryItemId
+      );
+
+      if (!inventoryItem || ingredient.quantity <= 0) {
+        return 0;
+      }
+
+      return inventoryItem.quantity / ingredient.quantity;
+    });
+
+    return Math.max(0, Math.floor(Math.min(...portionsPerIngredient)));
+  };
+
   return (
-    <div className="p-4">
-        {/* Header */}
-        <div className="mb-6">
-          {activeTab === 'work' ? (
-            <div className="sticky top-0 bg-white border-b-2 border-gray-200 p-4 flex items-center justify-between z-10 mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">Track Orders</h1>
-              <button
-                onClick={handleExitToHome}
-                className="text-gray-600 active:bg-gray-100 p-2 rounded-lg transition-colors"
-              >
-                <X size={28} strokeWidth={2.5} />
-              </button>
+    <div className="relative h-full overflow-hidden flex flex-col ">
+      {/* Header */}
+      <div className="shrink-0 p-4 pb-0">
+        {activeTab === 'work' && (
+          <div className="bg-white border-b-2 border-gray-200 p-4 flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">Log Sales</h1>
+            <button
+              onClick={handleExitToHome}
+              className="text-gray-600 active:bg-gray-100 p-2 rounded-lg transition-colors"
+            >
+              <X size={28} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {activeTab === 'work' && saleToast && (
+        <div className="pointer-events-none absolute top-[86px] left-1/2 -translate-x-1/2 z-30 w-[360px] max-w-[calc(100%-2rem)]">
+          <div
+              className={`rounded-2xl border-2 px-5 py-4 flex items-start gap-3 shadow-lg ${
+                saleToast.type === 'error'  
+                  ? 'border-red-600 bg-gray-100'
+                  : 'border-green-600 bg-green-100'
+              }`}
+          >
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 ml-2">
+              {saleToast.type === 'error' ? (
+                <AlertTriangle size={24} strokeWidth={2.75} className="text-red-600" />
+              ) : (
+                <CheckCircle size={24} strokeWidth={2.75} className="text-green-600" />
+              )}
             </div>
-          ) : (
-            <div className="bg-orange-600 rounded-lg p-4 mb-4">
+            <p
+              className={`flex-1 min-w-0 whitespace-normal text-left font-bold text-base leading-tight ${
+                saleToast.type === 'error' ? 'text-red-800' : 'text-green-800'
+              }`}
+            >
+              {saleToast.message}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Menu Items by Category */}
+      <div className={`flex-1 min-h-0 overflow-y-auto px-4 hide-scrollbar ${activeTab === 'work' ? 'pb-28' : 'pb-4'}`}>
+
+        {activeTab !== 'work' && (
+          <div className="mb-4">
+            <div className="bg-orange-600 rounded-lg p-4">
               <h1 className="text-3xl font-bold text-white">Menu</h1>
             </div>
-          )}
-        
-        {/* Search Bar */}
-        <div className="relative" style={{marginTop: '30px'}}>
-          <Search 
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600" 
+          </div>
+        )}
+
+        <div className="relative mt-2 mb-4">
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600"
             size={20}
             strokeWidth={2.5}
           />
@@ -503,29 +591,29 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
             placeholder="Search dishes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3  border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
-    
+            className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg font-bold text-base focus:outline-none focus:border-orange-600"
           />
         </div>
 
-        {/* Add New Dish Button */}
-        <button
+        {activeTab !== 'work' && (
+          <button
             onClick={() => {
               setEditingItem(null);
               setShowEdit(true);
-              if (onFormStateChange) {  
+              if (onFormStateChange) {
                 onFormStateChange(true);
               }
             }}
-            className="w-full bg-orange-600 text-white rounded-lg p-4 font-bold text-lg flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-4"
+            className="w-full bg-orange-600 text-white rounded-lg p-4 font-bold text-lg flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mb-4"
           >
             <Plus size={28} strokeWidth={2.5} />
             Add New Dish
           </button>
-      </div>
+        )}
 
-      {/* Menu Items by Category */}
-      <div className="space-y-2 mb-3">{configuredDishCategories.map(category => {
+      <div className="space-y-2 mb-3">{configuredDishCategories
+        .filter((category) => (groupedItems[category]?.length ?? 0) > 0)
+        .map(category => {
           const items = groupedItems[category] || [];
           const itemCount = items.length;
           const isCollapsed = collapsedCategories.has(category);
@@ -560,6 +648,7 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                   ) : (
                     items.map(item => {
                       const isExpanded = expandedItemId === item.id;
+                      const availablePortions = getAvailablePortions(item);
                       
                       return (
                         <div key={item.id}>
@@ -587,7 +676,9 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                                       className="w-16 h-16 rounded-lg border-2 border-gray-300 object-cover"
                                     />
                                   ) : (
-                                    <div className="w-16 h-16 rounded-lg border-2 border-gray-300 bg-gray-100"></div>
+                                    <div className="w-16 h-16 rounded-lg border-2 border-gray-300 bg-gray-100 flex items-center justify-center">
+                                      <ChefHat size={28} className="text-gray-400" strokeWidth={2.5} />
+                                    </div>
                                   )}
                                 </div>
 
@@ -598,6 +689,12 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                                   </h3>
                                   <p className="text-orange-600 font-bold text-lg">
                                     ${item.price.toFixed(2)}
+                                  </p>
+                                  <p className="text-gray-600 font-bold text-base">
+                                    <span className={availablePortions <= 10 ? 'text-red-600' : 'text-green-600'}>
+                                      {availablePortions === 1 ? 'Portion' : 'Portions'} Left:{' '}
+                                      {availablePortions}
+                                    </span>
                                   </p>
                                 </div>
 
@@ -637,23 +734,11 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
                                         </button>
                                       </div>
                                     </div>
-                                  ) : quickSaleFeedback[item.id]?.status === 'loading' || quickSaleFeedback[item.id]?.status === 'success' ? (
-                                    /* Loading/Success Overlay */
-                                    <div className={`w-full h-[60px] flex items-center justify-center rounded-xl font-bold text-base transition-colors border-2 ${
-                                      quickSaleFeedback[item.id].status === 'success' 
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                                        : 'bg-gray-50 text-gray-500 border-gray-200'
-                                    }`}>
-                                      {quickSaleFeedback[item.id].status === 'success' ? (
-                                        <span className="flex items-center gap-2">
-                                          <CheckCircle size={22} strokeWidth={2.5} /> 
-                                          Logged {quickSaleFeedback[item.id].quantity} portion{quickSaleFeedback[item.id].quantity! > 1 ? 's' : ''}
-                                        </span>
-                                      ) : (
-                                        <span className="flex items-center gap-2 animate-pulse">
-                                          Recording...
-                                        </span>
-                                      )}
+                                  ) : quickSaleFeedback[item.id]?.status === 'loading' ? (
+                                    <div className="w-full h-[60px] flex items-center justify-center rounded-xl font-bold text-base transition-colors border-2 bg-gray-50 text-gray-500 border-gray-200">
+                                      <span className="flex items-center gap-2 animate-pulse">
+                                        Recording...
+                                      </span>
                                     </div>
                                   ) : (
                                     /* Default Bigger Buttons */
@@ -669,15 +754,27 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
 
                                         {/* Multiplier Buttons */}
                                         <div className="flex flex-1 gap-1 h-full pr-1">
-                                          {[1, 2, 3, 4].map(num => (
-                                            <button
-                                              key={num}
-                                              onClick={(e) => initiateQuickSale(item, num, e)}
-                                              className="flex-1 bg-white text-gray-800 hover:text-orange-600 active:bg-orange-600 active:text-white rounded-lg font-black text-xl shadow-sm transition-all border border-orange-100 flex items-center justify-center"
-                                            >
-                                              {num}x
-                                            </button>
-                                          ))}
+                                          {[1, 2, 3, 4].map(num => {
+                                            const isDisabled = availablePortions < num;
+
+                                            return (
+                                              <button
+                                                key={num}
+                                                onClick={(e) => {
+                                                  if (isDisabled) return;
+                                                  initiateQuickSale(item, num, e);
+                                                }}
+                                                disabled={isDisabled}
+                                                className={`flex-1 rounded-lg font-black text-xl shadow-sm border flex items-center justify-center transition-all ${
+                                                  isDisabled
+                                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                    : 'bg-white text-gray-800 hover:text-orange-600 active:bg-orange-600 active:text-white border-orange-100'
+                                                }`}
+                                              >
+                                                {num}x
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       </div>
 
@@ -754,13 +851,14 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
           );
         })}
       </div>
+      </div>
 
       {activeTab === 'work' && !quickSaleItem && (
-        <div className="fixed bottom-6 left-0 right-0 max-w-md mx-auto px-4 z-20 pointer-events-none">
+        <div className="shrink-0 px-4 pb-4 pt-2 bg-white">
           <div className="flex justify-center">
             <button
               onClick={handleVoiceOrder}
-              className={`pointer-events-auto w-20 h-20 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-white transition-colors ${
+              className={`w-20 h-20 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-white transition-colors ${
                 isListening
                   ? 'bg-red-600 active:bg-red-700 animate-pulse'
                   : 'bg-orange-600 active:bg-orange-700'
@@ -771,7 +869,7 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
           </div>
         </div>
       )}
-
+  
       {/* Quick Sale Modal */}
       {quickSaleItem && (
         <QuickSale
@@ -783,6 +881,12 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
             setVoicePrefillQuantity(1);
           }}
           onConfirm={handleSaleConfirm}
+          onSaleLogged={(menuItemName, quantity) => {
+            showSaleToast(
+              `Logged ${quantity} portion${quantity > 1 ? 's' : ''} of ${menuItemName}`,
+              'success'
+            );
+          }}
         />
       )}
     </div>

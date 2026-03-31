@@ -60,6 +60,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
   const [restockingItem, setRestockingItem] = useState<InventoryItem | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'restock'>(initialSubTab === 'restock' ? 'restock' : 'overview');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [restockMode, setRestockMode] = useState<'required' | 'optional'>('required');
 
   const configuredIngredientCategories = useMemo(() => {
     const baseCategories = getStoredIngredientCategories();
@@ -260,8 +261,9 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
     closeAddEdit();
   };
 
-  const handleRestockClick = (item: InventoryItem) => {
+  const handleRestockClick = (item: InventoryItem, mode: 'required' | 'optional' = 'required') => {
     setRestockingItem(item);
+    setRestockMode(mode);
     setShowRestockModal(true);
   };
 
@@ -383,10 +385,12 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
     return (
       <RestockModal
         item={restockingItem}
+        restockMode={restockMode}
         onRestock={handleRestock}
         onClose={() => {
           setShowRestockModal(false);
           setRestockingItem(null);
+          setRestockMode('required');
         }}
       />
     );
@@ -603,21 +607,21 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
                           {hasPendingRestock && (
                             <div className="mt-3 bg-yellow-50 border-2 border-yellow-600 rounded-lg p-3">
                               <div className="flex items-center justify-between mb-1">
-                                <p className="text-yellow-900 font-bold text-xs flex items-center gap-1">
+                                <p className="text-yellow-900 font-bold text-base flex items-center gap-1">
                                   <Package size={14} strokeWidth={2.5} />
                                   RESTOCK PENDING
                                 </p>
-                                <p className="text-yellow-700 font-bold text-sm">
+                                <p className="text-yellow-700 font-bold text-base">
                                   +{item.pendingRestock!.quantity.toFixed(1)} {item.unit}
                                 </p>
                               </div>
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between text-base">
                                 <p className="text-gray-600 font-bold">{item.pendingRestock!.supplier}</p>
                                 <p className="text-gray-900 font-bold">${item.pendingRestock!.estimatedCost.toFixed(2)}</p>
                               </div>
                               <button
                                 onClick={() => handleMarkReceived(item)}
-                                className="w-full bg-yellow-600 text-white rounded-lg p-2 font-bold text-sm active:bg-yellow-700 transition-colors"
+                                className="w-full bg-yellow-600 text-white rounded-lg p-2 font-bold text-base active:bg-yellow-700 transition-colors"
                               >
                                 Mark as Received
                               </button>
@@ -626,7 +630,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
 
                           {activeTab === 'restock' && isLow && !hasPendingRestock && (
                             <button
-                              onClick={() => handleRestockClick(item)}
+                              onClick={() => handleRestockClick(item, 'required')}
                               className="w-full bg-orange-600 text-white rounded-lg p-2 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
                               style={{ marginTop: '25px' }}
                             >
@@ -648,8 +652,8 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
       {activeTab === 'restock' && visibleOptionalCategories.length > 0 && (
         <>
           <div className="bg-blue-50 border-2 border-blue-600 rounded-lg p-4 mb-3">
-            <p className="text-blue-900 font-bold text-sm text-center">
-              ℹ️ Optional Restock - These ingredients don't need immediate restocking
+            <p className="text-blue-900 font-bold text-base text-center">
+              Optional Restock - No urgent restock needed
             </p>
           </div>
 
@@ -754,7 +758,7 @@ export default function InventoryList({ initialSubTab = 'stock', onFormStateChan
 
                             {!hasPendingRestock && (
                               <button
-                                onClick={() => handleRestockClick(item)}
+                                onClick={() => handleRestockClick(item, 'optional')}
                                 className="w-full bg-orange-600 text-white rounded-lg p-2 font-bold text-base flex items-center justify-center gap-2 active:bg-orange-700 transition-colors mt-3"
                                 style={{ marginTop: '25px' }}
                               >

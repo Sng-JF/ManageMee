@@ -1686,6 +1686,17 @@
   --sidebar-ring: oklch(.439 0 0);
 }
 
+.hide-scrollbar {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE / old Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;              /* Chrome / Safari / Edge */
+}
+
 html {
   font-size: var(--font-size);
 }
