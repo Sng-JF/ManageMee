@@ -180,7 +180,7 @@ export default function Settings({ onLogout, onFormStateChange }: SettingsProps)
 
   return (
     <div className="h-full relative bg-white overflow-hidden">
-      <div className="h-full overflow-y-auto p-4 pb-24 max-w-2xl mx-auto">
+      <div className="h-full overflow-y-auto hide-scrollbar p-4 pb-24 max-w-2xl mx-auto">
         <div className="mb-3">
           <div className="bg-orange-600 rounded-lg p-3 mb-2">
             <h1 className="text-2xl font-bold text-white">Settings</h1>
@@ -235,7 +235,7 @@ export default function Settings({ onLogout, onFormStateChange }: SettingsProps)
 
         <div className="mt-8 text-center">
           <p className="text-gray-400 font-bold text-sm">Hawker Inventory Manager</p>
-          <p className="text-gray-400 font-bold text-xs">Version 1.0.0</p>
+          <p className="text-gray-400 font-bold text-xs">Version 2.1.1</p>
         </div>
       </div>
 
@@ -252,7 +252,7 @@ export default function Settings({ onLogout, onFormStateChange }: SettingsProps)
               </button>
             </div>
 
-            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto hide-scrollbar">
               {activeModal === 'userProfile' && (
                 <>
                   {/* <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">

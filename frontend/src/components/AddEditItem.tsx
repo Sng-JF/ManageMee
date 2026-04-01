@@ -364,8 +364,9 @@ export default function AddEditItem({ item, onSave, onCancel, onDelete, isDelete
       ...item,
       name: formData.name,
       category: categoryName,
-      quantity: isEditing ? item.quantity : parseFloat(formData.quantity),
+
       unit: isEditing ? item.unit : formData.unit,
+      quantity: Number.parseFloat(formData.quantity || '0'),
       minQuantity: parseFloat(formData.minQuantity),
       supplier: supplierName,
       targetPrice: parseFloat(formData.targetPrice) || 0,

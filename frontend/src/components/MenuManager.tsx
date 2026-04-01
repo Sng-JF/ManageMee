@@ -508,21 +508,96 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
   };
 
   const getAvailablePortions = (item: MenuItem) => {
-    if (!item.ingredients.length) return 0;
+    // If there are no ingredients, treat as 0 portions (matches existing UI expectations)
+    if (!item.ingredients || item.ingredients.length === 0) return 0;
 
-    const portionsPerIngredient = item.ingredients.map((ingredient) => {
+    // helper: extract numeric part from strings like "100g", "0.5", "1,5kg"
+    const parseNumber = (raw: number | string | undefined): number => {
+      if (typeof raw === 'number') return raw;
+      if (!raw) return NaN;
+      const s = String(raw);
+      const m = s.match(/-?\d+(?:[.,]\d+)?/);
+      if (!m) return NaN;
+      return Number(m[0].replace(',', '.'));
+    };
+
+    // helper: normalize unit -> category and convert to base units
+    const unitCategory = (u?: string) => {
+      if (!u) return null;
+      const uu = String(u).toLowerCase().trim();
+      if (['g', 'gram', 'grams'].includes(uu)) return 'mass';
+      if (['kg', 'kilogram', 'kilograms'].includes(uu)) return 'mass';
+      if (['ml', 'milliliter', 'millilitre', 'millilitres', 'milliliters'].includes(uu)) return 'volume';
+      if (['l', 'liter', 'litre', 'liters', 'litres'].includes(uu)) return 'volume';
+      if (['pc', 'pcs', 'piece', 'pieces', 'unit', 'units'].includes(uu)) return 'count';
+      return null;
+    };
+
+    const toBase = (amount: number, unit?: string) => {
+      if (!unit) return amount;
+      const uu = String(unit).toLowerCase().trim();
+      // mass -> grams
+      if (['g', 'gram', 'grams'].includes(uu)) return amount;
+      if (['kg', 'kilogram', 'kilograms'].includes(uu)) return amount * 1000;
+      // volume -> milliliters
+      if (['ml', 'milliliter', 'millilitre', 'millilitres', 'milliliters'].includes(uu)) return amount;
+      if (['l', 'liter', 'litre', 'liters', 'litres'].includes(uu)) return amount * 1000;
+      // count/unit
+      return amount;
+    };
+
+    let minPortions: number | null = null;
+
+    for (const ingredient of item.ingredients) {
+      // find matching inventory item
       const inventoryItem = inventoryItems.find(
         (inv) => inv.id === ingredient.inventoryItemId
       );
 
-      if (!inventoryItem || ingredient.quantity <= 0) {
+      // parse required amount (accept numbers or strings like "0.5" or "0,5" or "100g")
+      const reqRaw = ingredient.quantity;
+      const req = parseNumber(reqRaw);
+
+      if (!isFinite(req) || req <= 0) {
+        // invalid recipe amount -> 0 portions
         return 0;
       }
 
-      return inventoryItem.quantity / ingredient.quantity;
-    });
+      // parse inventory quantity
+      const invQtyRaw = inventoryItem?.quantity ?? 0;
+      const invQty = parseNumber(invQtyRaw);
 
-    return Math.max(0, Math.floor(Math.min(...portionsPerIngredient)));
+      if (!isFinite(invQty) || invQty <= 0) {
+        // no stock for this ingredient -> 0 portions
+        return 0;
+      }
+
+      const ingUnit = ingredient.unit ?? undefined;
+      const invUnit = inventoryItem?.unit ?? undefined;
+
+      const catIng = unitCategory(ingUnit);
+      const catInv = unitCategory(invUnit);
+
+      let portionsForThis = 0;
+
+      if (catIng && catInv && catIng === catInv) {
+        // convert both to same base (grams / milliliters / count) then compute
+        const reqBase = toBase(req, ingUnit);
+        const invBase = toBase(invQty, invUnit);
+        if (!isFinite(reqBase) || reqBase <= 0) return 0;
+        portionsForThis = Math.floor(invBase / reqBase);
+      } else {
+        // units unknown or incompatible — assume they are in the same unit
+        // (safer fallback than forcing 0). This handles cases like missing unit metadata.
+        portionsForThis = Math.floor(invQty / req);
+      }
+
+      if (minPortions === null || portionsForThis < minPortions) {
+        minPortions = portionsForThis;
+      }
+    }
+
+    return Math.max(0, minPortions ?? 0);
   };
 
   return (
@@ -612,8 +687,13 @@ export default function MenuManager({ initialSubTab = 'all', onFormStateChange, 
         )}
 
       <div className="space-y-2 mb-3">{configuredDishCategories
-        .filter((category) => (groupedItems[category]?.length ?? 0) > 0)
-        .map(category => {
+          .filter((category) => {
+            if (activeTab === 'work') {
+              return (groupedItems[category]?.length ?? 0) > 0;
+            }
+            return true;
+          })
+          .map((category) => {
           const items = groupedItems[category] || [];
           const itemCount = items.length;
           const isCollapsed = collapsedCategories.has(category);
